@@ -1,0 +1,49 @@
+# ==========================================
+# Personal Strava Data (Privacy Protection)
+# ==========================================
+# Never commit your personal export archives or telemetry
+activities.csv
+profile.csv
+bikes.csv
+personal_data.js
+*.zip
+*.fit
+*.fit.gz
+*.gpx
+*.tcx
+
+# ==========================================
+# Python & Environment
+# ==========================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+env/
+build/
+dist/
+
+# ==========================================
+# Operating System & IDE Files
+# ==========================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# ==========================================
+# Temporary & Log Files
+# ==========================================
+*.log
+scratch/
+tmp/

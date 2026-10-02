@@ -1,0 +1,2392 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title id="pageTitle">Strava Cycling Analytics Dashboard – 100% Client-Side & Private</title>
+  <meta name="description" content="Lifetime & Year-on-Year Cycling Performance Analytics generated from your Strava export archive. 100% client-side privacy, zero data leaves your device.">
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+  <!-- zip.js: streaming in-browser zip extraction without memory exhaustion -->
+  <script src="https://cdn.jsdelivr.net/npm/@zip.js/zip.js@2.7.45/dist/zip.min.js"></script>
+  <!-- PapaParse: robust in-browser CSV parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- Demo Data script (Fictitious Demo Dataset) -->
+  <script src="demo_data.js"></script>
+
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'system-ui', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            strava: {
+              DEFAULT: '#FC4C02',
+              hover: '#E34402',
+              subtle: '#2E1A11',
+              glow: 'rgba(252, 76, 2, 0.15)'
+            },
+            dark: {
+              950: '#090B0E',
+              900: '#0F1318',
+              850: '#151A22',
+              800: '#1C232D',
+              700: '#2A3442',
+              600: '#3D4B5E'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      background-color: #090B0E;
+      color: #E2E8F0;
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    }
+    .stat-glow {
+      box-shadow: 0 0 25px -5px rgba(252, 76, 2, 0.12);
+    }
+    .dropzone-pulse {
+      box-shadow: 0 0 40px -5px rgba(252, 76, 2, 0.25);
+    }
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #0F1318;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #2A3442;
+      border-radius: 3px;
+    }
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+      background: #FC4C02;
+    }
+    .chartjs-tooltip {
+      transition: all 0.15s ease-out;
+    }
+    @keyframes pulseGlow {
+      0%, 100% { opacity: 0.6; transform: scale(1); }
+      50% { opacity: 1; transform: scale(1.02); }
+    }
+    .animate-pulse-glow {
+      animation: pulseGlow 3s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-200 antialiased selection:bg-strava selection:text-white">
+
+  <!-- ========================================== -->
+  <!-- 1. LANDING & ONBOARDING VIEW               -->
+  <!-- ========================================== -->
+  <div id="landingView" class="min-h-screen flex flex-col justify-between">
+    
+    <!-- Top Landing Bar -->
+    <header class="border-b border-dark-800 bg-dark-950/80 backdrop-blur-md sticky top-0 z-40">
+      <div class="max-w-6xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
+        <div class="flex items-center space-x-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-strava to-orange-400 flex items-center justify-center shadow-lg shadow-strava/20 ring-1 ring-white/20">
+            <svg class="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center space-x-2">
+              <span class="font-bold text-white tracking-tight">Strava Analytics</span>
+              <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">100% Client-Side</span>
+            </div>
+            <p class="text-[11px] text-slate-400">Lifetime Telemetry • Eddington Consistency • YoY Curves</p>
+          </div>
+        </div>
+        <div>
+          <button onclick="loadDemoPreview()" class="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-dark-800 hover:bg-dark-700 text-slate-200 border border-dark-700 hover:border-slate-500 transition shadow">
+            <span>✨ Try Demo Preview</span>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Main Landing Container -->
+    <main class="max-w-5xl mx-auto px-4 sm:px-6 py-10 sm:py-14 space-y-12">
+      
+      <!-- Hero Headline -->
+      <div class="text-center space-y-4 max-w-3xl mx-auto">
+        <div class="inline-flex items-center space-x-2 px-3 py-1 rounded-full bg-strava/10 border border-strava/25 text-strava text-xs font-bold tracking-wide uppercase">
+          <span class="w-2 h-2 rounded-full bg-strava animate-pulse"></span>
+          <span>Zero-Knowledge Architecture • No Server Uploads</span>
+        </div>
+        <h1 class="text-3xl sm:text-5xl font-black text-white tracking-tight leading-tight">
+          Turn Your Strava Export Into an <span class="bg-gradient-to-r from-strava via-orange-400 to-amber-300 bg-clip-text text-transparent">Elite Cycling Dashboard</span>
+        </h1>
+        <p class="text-sm sm:text-base text-slate-400 max-w-2xl mx-auto leading-relaxed">
+          Eddington numbers, multi-year cumulative pacing, century milestones, bike fleet breakdowns, and all-time records. Everything is calculated in your browser memory — <span class="text-slate-200 font-semibold">zero bytes of your data leave your computer.</span>
+        </p>
+      </div>
+
+      <!-- 3-Step Strava Export Instructions -->
+      <div class="bg-dark-900/90 border border-dark-800 rounded-3xl p-6 sm:p-8 space-y-6 relative overflow-hidden shadow-2xl">
+        <div class="flex items-center justify-between border-b border-dark-800/80 pb-4">
+          <div class="flex items-center space-x-2.5">
+            <span class="w-3 h-3 rounded-full bg-strava"></span>
+            <h2 class="text-base sm:text-lg font-bold text-white">How to Download Your Strava History</h2>
+          </div>
+          <span class="text-xs text-slate-400 hidden sm:inline">Official Strava Data Export Flow</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
+          
+          <!-- Step 1 -->
+          <div class="bg-dark-850/70 border border-dark-800 rounded-2xl p-5 space-y-3 relative group hover:border-dark-700 transition">
+            <div class="flex items-center justify-between">
+              <span class="w-7 h-7 rounded-lg bg-dark-800 border border-dark-700 text-xs font-bold text-strava flex items-center justify-center font-mono">1</span>
+              <span class="text-slate-500 text-xs font-mono">strava.com</span>
+            </div>
+            <h3 class="font-bold text-white text-sm">Open Account Settings</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Log into <a href="https://www.strava.com" target="_blank" rel="noopener noreferrer" class="text-strava underline font-medium hover:text-orange-400">Strava.com</a> on your computer. Hover over your profile photo in the top right and click <strong class="text-slate-300">Settings</strong>, then click <strong class="text-slate-300">My Account</strong>.
+            </p>
+          </div>
+
+          <!-- Step 2 -->
+          <div class="bg-dark-850/70 border border-dark-800 rounded-2xl p-5 space-y-3 relative group hover:border-dark-700 transition">
+            <div class="flex items-center justify-between">
+              <span class="w-7 h-7 rounded-lg bg-dark-800 border border-dark-700 text-xs font-bold text-strava flex items-center justify-center font-mono">2</span>
+              <span class="text-slate-500 text-xs font-mono">Archive Request</span>
+            </div>
+            <h3 class="font-bold text-white text-sm">Request Your Archive</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Scroll down to <strong class="text-slate-300">Download or Delete Your Account</strong>. Under Step 2, click <strong class="text-slate-300">Get Started</strong>, then click <strong class="text-strava">Request Your Archive</strong>.
+            </p>
+          </div>
+
+          <!-- Step 3 -->
+          <div class="bg-dark-850/70 border border-dark-800 rounded-2xl p-5 space-y-3 relative group hover:border-dark-700 transition">
+            <div class="flex items-center justify-between">
+              <span class="w-7 h-7 rounded-lg bg-dark-800 border border-dark-700 text-xs font-bold text-strava flex items-center justify-center font-mono">3</span>
+              <span class="text-slate-500 text-xs font-mono">Instant Analysis</span>
+            </div>
+            <h3 class="font-bold text-white text-sm">Drop Archive Here</h3>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Strava will email a download link in a few minutes. Download your <strong class="text-slate-300">.zip</strong> file (e.g. <span class="font-mono text-slate-400">strava_export_*.zip</span>) and drag it into the box below.
+            </p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Drag & Drop Zone -->
+      <div class="space-y-4">
+        <div id="dropZone" onclick="triggerFileInput()" class="relative border-2 border-dashed border-dark-700 hover:border-strava bg-dark-900/60 hover:bg-dark-850/60 rounded-3xl p-8 sm:p-12 text-center cursor-pointer transition-all duration-300 group">
+          <input type="file" id="stravaFileInput" accept=".zip,.csv" onchange="handleFileSelect(event)" class="hidden">
+          
+          <div class="max-w-md mx-auto space-y-4">
+            <!-- Icon -->
+            <div class="w-16 h-16 mx-auto rounded-2xl bg-dark-800 border border-dark-700 group-hover:border-strava/50 flex items-center justify-center text-strava transition-transform duration-300 group-hover:scale-110 shadow-lg">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+              </svg>
+            </div>
+
+            <!-- Labels -->
+            <div class="space-y-1.5">
+              <h3 class="text-lg sm:text-xl font-bold text-white">
+                Drag &amp; drop your Strava export <span class="text-strava">.zip</span> here
+              </h3>
+              <p class="text-xs sm:text-sm text-slate-400">
+                or click to browse your computer (<span class="font-mono text-slate-300">strava_export_*.zip</span> or <span class="font-mono text-slate-300">activities.csv</span>)
+              </p>
+            </div>
+
+            <div class="pt-2 flex items-center justify-center gap-2 text-[11px] text-slate-500 font-mono">
+              <span class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700">Supports .ZIP</span>
+              <span class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700">Supports .CSV</span>
+              <span class="px-2 py-0.5 rounded bg-dark-800 border border-dark-700">100% In-Memory</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Processing State Container (Hidden by default) -->
+        <div id="processingStatus" class="hidden bg-dark-900 border border-strava/40 rounded-2xl p-5 text-center space-y-3 shadow-lg shadow-strava/10">
+          <div class="flex items-center justify-center space-x-3">
+            <svg class="animate-spin h-5 w-5 text-strava" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+            <span id="processingStatusText" class="text-sm font-semibold text-white">Analyzing archive in local browser memory...</span>
+          </div>
+          <div class="w-full bg-dark-800 rounded-full h-1.5 overflow-hidden">
+            <div id="progressBar" class="bg-strava h-1.5 rounded-full transition-all duration-300 w-1/3"></div>
+          </div>
+        </div>
+
+        <!-- Error Container (Hidden by default) -->
+        <div id="errorMessage" class="hidden bg-red-950/40 border border-red-800/80 rounded-2xl p-4 text-xs text-red-300 text-center space-y-1">
+          <p class="font-bold text-red-200" id="errorTitle">Could not process file</p>
+          <p id="errorDetail">Please ensure the zip file contains your activities.csv export.</p>
+        </div>
+      </div>
+
+      <!-- Trust & Privacy Shield -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        
+        <!-- Privacy Guarantee -->
+        <div class="bg-gradient-to-br from-dark-900 to-dark-850 border border-emerald-900/40 rounded-2xl p-5 flex items-start space-x-3.5">
+          <div class="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
+            </svg>
+          </div>
+          <div class="space-y-1">
+            <h4 class="text-sm font-bold text-white flex items-center space-x-1.5">
+              <span>Zero-Knowledge Privacy</span>
+              <span class="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">Verified</span>
+            </h4>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Your files never leave your computer. Parsing and calculations run entirely in your browser's local sandbox memory. Zero network requests or telemetry.
+            </p>
+          </div>
+        </div>
+
+        <!-- Standalone Offline Export Feature -->
+        <div class="bg-gradient-to-br from-dark-900 to-dark-850 border border-dark-800 rounded-2xl p-5 flex items-start space-x-3.5">
+          <div class="w-9 h-9 rounded-xl bg-strava/10 border border-strava/20 text-strava flex items-center justify-center shrink-0 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          </div>
+          <div class="space-y-1">
+            <h4 class="text-sm font-bold text-white">Save Locally for Offline Viewing</h4>
+            <p class="text-xs text-slate-400 leading-relaxed">
+              Once loaded, you can click <strong class="text-slate-300">"Download HTML"</strong> to save a permanent, self-contained file you can double-click and open anytime without internet.
+            </p>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- Landing Footer -->
+    <footer class="border-t border-dark-800/80 bg-dark-950 py-6 text-center text-xs text-slate-500">
+      <div class="max-w-5xl mx-auto px-4 space-y-1">
+        <p>Strava Cycling Analytics Dashboard • Built for endurance cyclists • 100% Client-Side Static Architecture</p>
+        <p class="text-slate-600 text-[11px]">Deployable to Cloudflare Pages or run locally in any web browser.</p>
+      </div>
+    </footer>
+
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- 2. FULL INTERACTIVE DASHBOARD VIEW         -->
+  <!-- ========================================== -->
+  <div id="dashboardView" class="hidden min-h-screen">
+    
+    <!-- TOP APP BAR -->
+    <header class="sticky top-0 z-50 backdrop-blur-xl bg-dark-950/90 border-b border-dark-800 shadow-md shadow-black/20">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 lg:py-0 lg:h-16 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-2.5 lg:gap-4">
+        
+        <!-- Brand & Cyclist Info -->
+        <div class="flex items-center space-x-3 sm:space-x-4 min-w-0">
+          <div class="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-strava to-orange-400 flex items-center justify-center shadow-lg shadow-strava/20 ring-1 ring-white/20 shrink-0">
+            <svg class="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+            </svg>
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center space-x-2">
+              <h1 id="headerAthleteName" class="text-base sm:text-lg font-bold tracking-tight text-white truncate">Alex Rivera</h1>
+              <span class="inline-flex items-center px-1.5 sm:px-2 py-0.5 rounded text-[10px] sm:text-xs font-semibold bg-strava/10 text-strava border border-strava/20 shrink-0">Strava Pro</span>
+            </div>
+            <p class="text-[11px] sm:text-xs text-slate-400 flex items-center space-x-1.5 sm:space-x-2 truncate">
+              <span id="headerAthleteLocation" class="truncate">Boulder, Colorado</span>
+              <span class="text-slate-600">•</span>
+              <span class="hidden sm:inline" id="headerYearsCycling">Endurance Telemetry</span>
+              <span class="hidden sm:inline text-slate-600">•</span>
+              <span id="headerTotalRides" class="shrink-0">315 Rides</span>
+            </p>
+          </div>
+        </div>
+
+        <!-- Controls: Actions, Unit Toggle & Filters -->
+        <div class="flex items-center justify-between lg:justify-end gap-2 sm:gap-3 flex-wrap">
+          
+          <!-- Download Standalone HTML Button -->
+          <button id="btnDownloadHtml" onclick="downloadStandaloneHtml()" title="Download a self-contained offline HTML file of this dashboard" class="inline-flex items-center space-x-1.5 px-2.5 sm:px-3 py-1.5 text-xs font-bold rounded-xl bg-gradient-to-r from-strava to-orange-500 hover:from-orange-500 hover:to-orange-600 text-white shadow-md shadow-strava/20 transition-all transform active:scale-95 shrink-0">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+            </svg>
+            <span>Download HTML</span>
+          </button>
+
+          <!-- Return / Upload Different File Button -->
+          <button id="btnChangeData" onclick="returnToLanding()" title="Select a different Strava export file" class="inline-flex items-center space-x-1.5 px-2.5 py-1.5 text-xs font-medium rounded-xl bg-dark-850 hover:bg-dark-700 text-slate-300 border border-dark-700 transition shrink-0">
+            <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+            </svg>
+            <span class="hidden sm:inline">Change File</span>
+          </button>
+
+          <!-- Unit Toggle Button -->
+          <div class="inline-flex p-0.5 sm:p-1 rounded-xl bg-dark-850 border border-dark-700/60 shadow-inner shrink-0">
+            <button id="btnMetric" onclick="setUnit('metric')" class="px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg transition-all duration-200 bg-strava text-white shadow">
+              Metric<span class="hidden sm:inline"> (km)</span>
+            </button>
+            <button id="btnImperial" onclick="setUnit('imperial')" class="px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all duration-200">
+              Imperial<span class="hidden sm:inline"> (mi)</span>
+            </button>
+          </div>
+
+          <!-- Scope Filter: All / Outdoor / Virtual -->
+          <div class="hidden md:inline-flex p-0.5 sm:p-1 rounded-xl bg-dark-850 border border-dark-700/60 shrink-0">
+            <button id="btnTypeAll" onclick="setTypeFilter('all')" class="px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-700 text-white">All</button>
+            <button id="btnTypeOutdoor" onclick="setTypeFilter('outdoor')" class="px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white">Outdoor</button>
+            <button id="btnTypeVirtual" onclick="setTypeFilter('virtual')" class="px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white">Virtual</button>
+          </div>
+
+          <!-- Year Selector Dropdown -->
+          <div class="relative flex-1 sm:flex-initial sm:w-44 min-w-[120px]">
+            <select id="yearSelector" onchange="onYearChange(this.value)" class="w-full appearance-none bg-dark-850 border border-dark-700 hover:border-slate-500 text-white font-medium text-xs sm:text-sm rounded-xl pl-2.5 sm:pl-3 pr-7 sm:pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-strava cursor-pointer transition truncate">
+              <option value="lifetime">Lifetime (All Years)</option>
+            </select>
+            <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 sm:px-2.5 text-slate-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </header>
+
+    <!-- MAIN DASHBOARD CONTENT -->
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+
+      <!-- HERO / ACTIVE VIEW BANNER -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-dark-900 via-dark-850 to-dark-900 p-6 rounded-2xl border border-dark-800 shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 w-64 h-64 bg-strava/5 rounded-full blur-3xl pointer-events-none"></div>
+        
+        <div>
+          <div class="inline-flex items-center space-x-2 text-strava text-xs font-bold uppercase tracking-wider mb-1">
+            <span class="w-2 h-2 rounded-full bg-strava animate-pulse"></span>
+            <span id="viewScopeLabel">Lifetime Career Overview</span>
+          </div>
+          <h2 id="viewHeading" class="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">All-Time Cycling Legacy</h2>
+          <p id="viewSubtext" class="text-sm text-slate-400 mt-1">Endurance telemetry, Eddington numbers, and cumulative curves.</p>
+        </div>
+
+        <!-- Quick Badges -->
+        <div class="flex flex-wrap items-center gap-2">
+          <div class="px-3 py-1.5 rounded-xl bg-dark-800/80 border border-dark-700/80 text-xs text-slate-300 flex items-center space-x-1.5">
+            <span class="text-emerald-400">🌍</span>
+            <span id="badgeEarthLaps">--x Earth Circumference</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-dark-800/80 border border-dark-700/80 text-xs text-slate-300 flex items-center space-x-1.5">
+            <span class="text-cyan-400">🏔️</span>
+            <span id="badgeEverests">--x Mt. Everest</span>
+          </div>
+          <div class="px-3 py-1.5 rounded-xl bg-dark-800/80 border border-dark-700/80 text-xs text-slate-300 flex items-center space-x-1.5">
+            <span class="text-amber-400">⏱️</span>
+            <span id="badgeTimeSaddle">-- Days in Saddle</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- PRIMARY KPI METRIC CARDS -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+        
+        <!-- Distance -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>DISTANCE</span>
+            <span class="text-strava font-bold">🛣️</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statDistance">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5" id="statDistanceUnit">kilometers</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statDistanceSub">
+            <span>Avg / ride:</span>
+            <span class="font-mono text-slate-200" id="statAvgDist">--</span>
+          </div>
+        </div>
+
+        <!-- Elevation -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>CLIMBING</span>
+            <span class="text-cyan-400 font-bold">⛰️</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statElevation">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5" id="statElevationUnit">meters gained</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statElevationSub">
+            <span>Ratio:</span>
+            <span class="font-mono text-cyan-300" id="statClimbRatio">--</span>
+          </div>
+        </div>
+
+        <!-- Saddle Time -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>SADDLE TIME</span>
+            <span class="text-amber-400 font-bold">⏱️</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statTime">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5">hours moving</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statTimeSub">
+            <span>Active days:</span>
+            <span class="font-mono text-slate-200" id="statActiveDays">--</span>
+          </div>
+        </div>
+
+        <!-- Total Rides -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>RIDES</span>
+            <span class="text-emerald-400 font-bold">🚴</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statRides">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5">activities</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statRidesSub">
+            <span>Out / Virt:</span>
+            <span class="font-mono text-slate-200" id="statRideSplit">--</span>
+          </div>
+        </div>
+
+        <!-- Average Speed -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>AVG SPEED</span>
+            <span class="text-purple-400 font-bold">⚡</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statSpeed">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5" id="statSpeedUnit">km/h</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statSpeedSub">
+            <span>Weighted avg:</span>
+            <span class="font-mono text-purple-300">pace</span>
+          </div>
+        </div>
+
+        <!-- Energy / Calories -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-4 flex flex-col justify-between hover:border-dark-700 transition stat-glow">
+          <div class="flex items-center justify-between text-slate-400 text-xs font-semibold">
+            <span>ENERGY</span>
+            <span class="text-rose-400 font-bold">🔥</span>
+          </div>
+          <div class="mt-2">
+            <div class="text-xl sm:text-2xl font-black tracking-tight text-white font-mono" id="statCals">--</div>
+            <div class="text-xs text-slate-400 font-medium mt-0.5">calories burnt</div>
+          </div>
+          <div class="mt-3 pt-2 border-t border-dark-800 text-[11px] text-slate-400 flex items-center justify-between" id="statCalsSub">
+            <span>Est. total</span>
+            <span class="font-mono text-rose-300">work</span>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- EDDINGTON & TROPHY CABINET ROW -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Eddington Number Showcase -->
+        <div class="bg-gradient-to-br from-dark-900 to-dark-850 border border-dark-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl relative overflow-hidden">
+          <div class="absolute -top-12 -right-12 w-36 h-36 bg-strava/10 rounded-full blur-2xl pointer-events-none"></div>
+
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-strava">Consistency Milestone</span>
+              <span class="px-2 py-0.5 rounded text-[10px] font-mono bg-dark-800 text-slate-400 border border-dark-700">Holy Grail</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mt-1">The Eddington Number (E)</h3>
+            <p class="text-xs text-slate-400 mt-1">
+              Rode at least <span class="text-slate-200 font-semibold font-mono" id="eddingtonDef">E units on E distinct days</span>.
+            </p>
+          </div>
+
+          <!-- Dual Display: Metric vs Imperial -->
+          <div class="grid grid-cols-2 gap-4 my-6">
+            
+            <!-- Metric Eddington -->
+            <div class="bg-dark-950/70 border border-dark-800 rounded-xl p-3.5 text-center relative group">
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block mb-1">METRIC (KM)</span>
+              <div class="text-4xl font-black font-mono text-white tracking-tight" id="eddingtonKm">--</div>
+              <div class="text-[11px] text-strava font-mono mt-1 font-semibold" id="eddingtonKmStatus">-- rides to E+1</div>
+              <div class="text-[10px] text-slate-500 mt-0.5" id="eddingtonKmTarget">Target: -- km</div>
+            </div>
+
+            <!-- Imperial Eddington -->
+            <div class="bg-dark-950/70 border border-dark-800 rounded-xl p-3.5 text-center relative group">
+              <span class="text-[10px] uppercase tracking-wider font-semibold text-slate-400 block mb-1">IMPERIAL (MILES)</span>
+              <div class="text-4xl font-black font-mono text-cyan-300 tracking-tight" id="eddingtonMi">--</div>
+              <div class="text-[11px] text-cyan-400 font-mono mt-1 font-semibold" id="eddingtonMiStatus">-- rides to E+1</div>
+              <div class="text-[10px] text-slate-500 mt-0.5" id="eddingtonMiTarget">Target: -- mi</div>
+            </div>
+
+          </div>
+
+          <div class="pt-3 border-t border-dark-800/80 flex items-center justify-between text-xs text-slate-400">
+            <span>Longest Streak:</span>
+            <span class="font-mono font-bold text-white flex items-center space-x-1" id="streakDisplay">
+              <span>-- Days</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Century Club Badge Collection -->
+        <div class="bg-gradient-to-br from-dark-900 to-dark-850 border border-dark-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-amber-400">Trophy Cabinet</span>
+              <span class="text-xs text-slate-500">Endurance Distances</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mt-1">Century Club Tracker</h3>
+            <p class="text-xs text-slate-400 mt-1">Lifetime big-mileage rides classified by classic milestones.</p>
+          </div>
+
+          <div class="grid grid-cols-2 gap-3 my-4">
+            
+            <div class="bg-dark-950/60 border border-dark-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-strava/10 text-strava flex items-center justify-center font-bold text-lg font-mono">
+                50k
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 font-medium">Half Century</div>
+                <div class="text-xl font-bold font-mono text-white" id="countHalfCentury">--</div>
+              </div>
+            </div>
+
+            <div class="bg-dark-950/60 border border-dark-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold text-lg font-mono">
+                100k
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 font-medium">Metric Century</div>
+                <div class="text-xl font-bold font-mono text-cyan-300" id="countMetricCentury">--</div>
+              </div>
+            </div>
+
+            <div class="bg-dark-950/60 border border-dark-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center font-bold text-lg font-mono">
+                100m
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 font-medium">Imperial Century</div>
+                <div class="text-xl font-bold font-mono text-amber-300" id="countImperialCentury">--</div>
+              </div>
+            </div>
+
+            <div class="bg-dark-950/60 border border-dark-800 rounded-xl p-3 flex items-center space-x-3">
+              <div class="w-10 h-10 rounded-lg bg-purple-500/10 text-purple-400 flex items-center justify-center font-bold text-lg font-mono">
+                200k
+              </div>
+              <div>
+                <div class="text-xs text-slate-400 font-medium">Double Century</div>
+                <div class="text-xl font-bold font-mono text-purple-300" id="countDoubleCentury">--</div>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="pt-3 border-t border-dark-800/80 text-xs text-slate-400 flex items-center justify-between">
+            <span>Career Century Volume:</span>
+            <span class="font-mono text-slate-200 font-semibold" id="centuriesTotalRides">-- rides total</span>
+          </div>
+        </div>
+
+        <!-- All-Time Crown Records -->
+        <div class="bg-gradient-to-br from-dark-900 to-dark-850 border border-dark-800 rounded-2xl p-6 flex flex-col justify-between shadow-xl">
+          <div>
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold uppercase tracking-wider text-emerald-400">Hall of Fame</span>
+              <span class="text-xs text-slate-500">Personal Bests</span>
+            </div>
+            <h3 class="text-lg font-bold text-white mt-1">All-Time Peak Records</h3>
+            <p class="text-xs text-slate-400 mt-1">Single-ride lifetime pinnacles across all seasons.</p>
+          </div>
+
+          <div class="space-y-2.5 my-3">
+            
+            <div class="flex items-center justify-between p-2 rounded-xl bg-dark-950/50 border border-dark-800 text-xs">
+              <span class="text-slate-400 flex items-center space-x-1.5 truncate max-w-[170px]">
+                <span class="text-strava">🏆</span>
+                <span class="truncate" id="recordLongestName">Longest Ride</span>
+              </span>
+              <span class="font-mono font-bold text-white" id="recordLongestVal">--</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-dark-950/50 border border-dark-800 text-xs">
+              <span class="text-slate-400 flex items-center space-x-1.5 truncate max-w-[170px]">
+                <span class="text-cyan-400">⛰️</span>
+                <span class="truncate" id="recordClimbName">Highest Climb</span>
+              </span>
+              <span class="font-mono font-bold text-cyan-300" id="recordClimbVal">--</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-dark-950/50 border border-dark-800 text-xs">
+              <span class="text-slate-400 flex items-center space-x-1.5 truncate max-w-[170px]">
+                <span class="text-amber-400">⏱️</span>
+                <span class="truncate" id="recordTimeName">Longest Saddle Time</span>
+              </span>
+              <span class="font-mono font-bold text-amber-300" id="recordTimeVal">--</span>
+            </div>
+
+            <div class="flex items-center justify-between p-2 rounded-xl bg-dark-950/50 border border-dark-800 text-xs">
+              <span class="text-slate-400 flex items-center space-x-1.5 truncate max-w-[170px]">
+                <span class="text-purple-400">⚡</span>
+                <span class="truncate" id="recordSpeedName">Fastest Sustained (>25km)</span>
+              </span>
+              <span class="font-mono font-bold text-purple-300" id="recordSpeedVal">--</span>
+            </div>
+
+          </div>
+
+          <div class="pt-2 text-right">
+            <a href="#activityLog" class="text-xs text-strava hover:underline">Explore all rides in explorer &darr;</a>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CHARTS SECTION 1: Multi-Year Pace Curves & Fleet Breakdown -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
+        <!-- Multi-Year Cumulative Pace Tracker (Day 1-365 curves) -->
+        <div class="lg:col-span-2 bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-strava">Year-on-Year Dynamics</div>
+              <h3 class="text-lg font-bold text-white">Cumulative Mileage Pace Tracker (Day 1 – 365)</h3>
+              <p class="text-xs text-slate-400">Overlay annual season arcs to gauge pace against prior years.</p>
+            </div>
+            <!-- Curve toggles -->
+            <div id="curveYearToggles" class="flex flex-wrap items-center gap-1.5">
+              <!-- Rendered via JS -->
+            </div>
+          </div>
+
+          <div class="h-80 w-full relative">
+            <canvas id="cumulativeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Bike Fleet Breakdown Doughnut -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4 flex flex-col justify-between">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-cyan-400">Equipment Insights</div>
+            <h3 class="text-lg font-bold text-white">Bike Fleet Mileage Share</h3>
+            <p class="text-xs text-slate-400">Lifetime distribution of miles across bikes.</p>
+          </div>
+
+          <div class="h-56 w-full relative">
+            <canvas id="gearChart"></canvas>
+          </div>
+
+          <div id="gearListLegend" class="space-y-1.5 pt-2 border-t border-dark-800 text-xs custom-scrollbar max-h-36 overflow-y-auto">
+            <!-- Rendered via JS -->
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CHARTS SECTION 2: Annual Volume Split & Monthly Seasonality -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Annual Volume & Outdoor vs Virtual Split -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-emerald-400">Annual History</div>
+              <h3 class="text-lg font-bold text-white">Annual Volume &amp; Type Split</h3>
+              <p class="text-xs text-slate-400">Outdoor road/gravel vs. Virtual (Zwift) riding.</p>
+            </div>
+            <div class="flex items-center space-x-3 text-xs">
+              <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded bg-[#FC4C02] inline-block"></span><span class="text-slate-300">Outdoor</span></span>
+              <span class="flex items-center space-x-1"><span class="w-3 h-3 rounded bg-[#06B6D4] inline-block"></span><span class="text-slate-300">Virtual</span></span>
+            </div>
+          </div>
+          <div class="h-72 w-full relative">
+            <canvas id="annualVolumeChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Monthly Seasonality -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-purple-400">Seasonal Patterns</div>
+            <h3 class="text-lg font-bold text-white" id="monthlyChartTitle">Monthly Seasonality Profile</h3>
+            <p class="text-xs text-slate-400">Monthly mileage profile across the active scope.</p>
+          </div>
+          <div class="h-72 w-full relative">
+            <canvas id="monthlyChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- CHARTS SECTION 3: Day of Week & Distance Distribution -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        
+        <!-- Day of Week -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-amber-400">Rhythm &amp; Routine</div>
+            <h3 class="text-lg font-bold text-white">Day of the Week Ride Count</h3>
+            <p class="text-xs text-slate-400">Weekly cadence breakdown across your entire cycling career.</p>
+          </div>
+          <div class="h-64 w-full relative">
+            <canvas id="dowChart"></canvas>
+          </div>
+        </div>
+
+        <!-- Distance Buckets -->
+        <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-rose-400">Ride Length Categorization</div>
+            <h3 class="text-lg font-bold text-white">Distance Distribution Histogram</h3>
+            <p class="text-xs text-slate-400">Count of activities categorized by ride length brackets.</p>
+          </div>
+          <div class="h-64 w-full relative">
+            <canvas id="distBucketsChart"></canvas>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- HISTORICAL LEDGER / YOY COMPARISON TABLE -->
+      <div class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-strava">Historical Telemetry</div>
+            <h3 class="text-lg font-bold text-white">Year-on-Year Season Comparison Ledger</h3>
+            <p class="text-xs text-slate-400">Complete performance ledger for all active years with YoY distance progression.</p>
+          </div>
+          <span class="text-xs text-slate-500 font-mono">Click any year row to inspect season</span>
+        </div>
+
+        <div class="overflow-x-auto custom-scrollbar">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead>
+              <tr class="border-b border-dark-800 text-slate-400 font-semibold font-mono">
+                <th class="py-3 px-3">SEASON</th>
+                <th class="py-3 px-3">RIDES</th>
+                <th class="py-3 px-3">OUT / VIRT</th>
+                <th class="py-3 px-3 text-right">DISTANCE</th>
+                <th class="py-3 px-3 text-right">ELEVATION</th>
+                <th class="py-3 px-3 text-right">MOVING TIME</th>
+                <th class="py-3 px-3 text-right">AVG DIST</th>
+                <th class="py-3 px-3 text-right">AVG SPEED</th>
+                <th class="py-3 px-3 text-right">CLIMB RATIO</th>
+                <th class="py-3 px-3 text-right">YoY DIST %</th>
+              </tr>
+            </thead>
+            <tbody id="yoyTableBody" class="divide-y divide-dark-800/60 font-mono">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- INTERACTIVE ACTIVITY LOG EXPLORER -->
+      <div id="activityLog" class="bg-dark-900 border border-dark-800 rounded-2xl p-6 shadow-xl space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="text-xs font-bold uppercase tracking-wider text-strava">Activity Explorer</div>
+            <h3 class="text-lg font-bold text-white">Complete Ride Log</h3>
+            <p class="text-xs text-slate-400">Interactive searchable database of every cycling activity.</p>
+          </div>
+
+          <!-- Search & Sort Controls -->
+          <div class="flex items-center space-x-2">
+            <div class="relative">
+              <input type="text" id="rideSearchInput" oninput="onSearchRides(this.value)" placeholder="Search rides, bikes..." class="bg-dark-850 border border-dark-700 text-white text-xs rounded-xl pl-8 pr-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-strava w-48 sm:w-64 placeholder:text-slate-500">
+              <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-slate-500">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+              </div>
+            </div>
+
+            <!-- Sort By -->
+            <div class="inline-flex p-0.5 rounded-xl bg-dark-850 border border-dark-700 text-xs">
+              <button id="sortDateBtn" onclick="setRideSort('date')" class="px-2.5 py-1 rounded-lg bg-dark-700 text-white font-medium">Date</button>
+              <button id="sortDistBtn" onclick="setRideSort('dist')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium">Dist</button>
+              <button id="sortElevBtn" onclick="setRideSort('elev')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium">Elev</button>
+              <button id="sortSpeedBtn" onclick="setRideSort('speed')" class="px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium">Speed</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Table -->
+        <div class="overflow-x-auto custom-scrollbar max-h-[500px]">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="sticky top-0 bg-dark-900 z-10 border-b border-dark-800 text-slate-400 font-semibold font-mono">
+              <tr>
+                <th class="py-2.5 px-3">DATE</th>
+                <th class="py-2.5 px-3">NAME</th>
+                <th class="py-2.5 px-3">TYPE</th>
+                <th class="py-2.5 px-3">GEAR</th>
+                <th class="py-2.5 px-3 text-right">DIST</th>
+                <th class="py-2.5 px-3 text-right">ELEV</th>
+                <th class="py-2.5 px-3 text-right">DURATION</th>
+                <th class="py-2.5 px-3 text-right">SPEED</th>
+                <th class="py-2.5 px-3 text-right">POWER / HR</th>
+              </tr>
+            </thead>
+            <tbody id="ridesTableBody" class="divide-y divide-dark-800/40 font-mono">
+              <!-- Populated by JS -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Pagination / Count Footer -->
+        <div class="mt-4 pt-3 border-t border-dark-800 flex flex-col sm:flex-row sm:items-center justify-between text-xs text-slate-400 gap-3">
+          <div>
+            Showing <span id="ridesDisplayCount" class="text-white font-bold">50</span> of <span id="ridesTotalCount" class="text-white font-bold">--</span> rides
+          </div>
+          <div class="flex items-center space-x-2">
+            <button id="btnLoadMoreRides" onclick="loadMoreRides()" class="px-3 py-1.5 rounded-xl bg-dark-800 hover:bg-dark-700 text-slate-200 border border-dark-700 transition font-medium">
+              Load More Rides
+            </button>
+          </div>
+        </div>
+
+      </div>
+
+    </main>
+
+    <!-- FOOTER -->
+    <footer class="mt-16 border-t border-dark-800/80 bg-dark-950 py-8 text-center text-xs text-slate-500">
+      <div class="max-w-7xl mx-auto px-4 space-y-2">
+        <p>Generated for <strong class="text-slate-300" id="footerAthleteName">Strava Athlete</strong> • 100% Client-Side In-Browser Telemetry</p>
+        <p class="font-mono text-[11px]" id="footerSummaryMetrics">Eddington: -- • Total Volume: -- • Everests Climbed: --</p>
+      </div>
+    </footer>
+
+  </div>
+
+
+  <!-- ========================================== -->
+  <!-- 3. INLINE JAVASCRIPT APPLICATION SCRIPT    -->
+  <!-- ========================================== -->
+  <script id="embeddedDataScript">
+    // window.DEFAULT_DATA is populated if running as a personal standalone file
+    window.DEFAULT_DATA = null;
+  </script>
+
+  <script>
+    // Global Application State
+    let DASHBOARD_DATA = null;
+    let currentUnit = 'metric'; // 'metric' or 'imperial'
+    let currentYearScope = 'lifetime'; // 'lifetime' or year number
+    let currentTypeFilter = 'all'; // 'all', 'outdoor', 'virtual'
+    let currentRideSort = 'date';
+    let rideSearchQuery = '';
+    let ridesPageLimit = 50;
+    let activeCurveYears = [];
+
+    // Chart.js references
+    let chartCumulative = null;
+    let chartGear = null;
+    let chartVolume = null;
+    let chartMonthly = null;
+    let chartDow = null;
+    let chartDistBuckets = null;
+
+    // ------------------------------------------
+    // File Input & Drag & Drop Handling
+    // ------------------------------------------
+    function triggerFileInput() {
+      document.getElementById('stravaFileInput').click();
+    }
+
+    // Drag-over styling
+    const dropZone = document.getElementById('dropZone');
+    ['dragenter', 'dragover'].forEach(eventName => {
+      window.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (dropZone) dropZone.classList.add('border-strava', 'dropzone-pulse');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      window.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (dropZone) dropZone.classList.remove('border-strava', 'dropzone-pulse');
+      }, false);
+    });
+
+    window.addEventListener('drop', (e) => {
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      if (files && files.length > 0) {
+        processInputFile(files[0]);
+      }
+    });
+
+    function handleFileSelect(e) {
+      const file = e.target.files[0];
+      if (file) {
+        processInputFile(file);
+      }
+    }
+
+    function showStatus(text, progressPct) {
+      const statusDiv = document.getElementById('processingStatus');
+      const textElem = document.getElementById('processingStatusText');
+      const barElem = document.getElementById('progressBar');
+      const errDiv = document.getElementById('errorMessage');
+      
+      errDiv.classList.add('hidden');
+      statusDiv.classList.remove('hidden');
+      textElem.textContent = text;
+      if (barElem && progressPct !== undefined) {
+        barElem.style.width = progressPct + '%';
+      }
+    }
+
+    function showError(title, detail) {
+      const statusDiv = document.getElementById('processingStatus');
+      const errDiv = document.getElementById('errorMessage');
+      const titleElem = document.getElementById('errorTitle');
+      const detailElem = document.getElementById('errorDetail');
+      
+      statusDiv.classList.add('hidden');
+      errDiv.classList.remove('hidden');
+      titleElem.textContent = title;
+      detailElem.textContent = detail;
+    }
+
+    async function processInputFile(file) {
+      const filename = file.name.toLowerCase();
+      showStatus(`Reading ${file.name}...`, 20);
+
+      try {
+        let activitiesText = '';
+        let profileText = '';
+        let bikesText = '';
+
+        if (filename.endsWith('.zip')) {
+          showStatus('Unpacking zip archive in browser memory...', 40);
+          const zipReader = new zip.ZipReader(new zip.BlobReader(file));
+          const entries = await zipReader.getEntries();
+          
+          let foundActivities = false;
+          for (const entry of entries) {
+            const entryName = entry.filename.toLowerCase();
+            if (entryName.endsWith('activities.csv')) {
+              showStatus('Extracting activities.csv...', 60);
+              activitiesText = await entry.getData(new zip.TextWriter());
+              foundActivities = true;
+            } else if (entryName.endsWith('profile.csv')) {
+              profileText = await entry.getData(new zip.TextWriter());
+            } else if (entryName.endsWith('bikes.csv')) {
+              bikesText = await entry.getData(new zip.TextWriter());
+            }
+          }
+          await zipReader.close();
+
+          if (!foundActivities || !activitiesText) {
+            throw new Error('activities.csv was not found inside the selected zip file. Please make sure this is your Strava bulk export archive.');
+          }
+        } else if (filename.endsWith('.csv')) {
+          showStatus('Reading CSV file...', 50);
+          activitiesText = await file.text();
+        } else {
+          throw new Error('Unsupported file format. Please drop your Strava export .zip or activities.csv file.');
+        }
+
+        showStatus('Computing Eddington numbers, YoY pace curves & records...', 80);
+        
+        // Parse and process activities
+        const parsedData = processActivitiesClientSide(activitiesText, profileText, bikesText);
+        showStatus('Finalizing dashboard...', 100);
+
+        setTimeout(() => {
+          loadDashboardData(parsedData, false);
+        }, 200);
+
+      } catch (err) {
+        console.error('Processing error:', err);
+        showError('Processing Error', err.message || 'Failed to process Strava export.');
+      }
+    }
+
+    // ------------------------------------------
+    // Client-Side CSV Parsing & Calculation Engine
+    // ------------------------------------------
+    function parseCsvRows(text) {
+      // Use PapaParse if available
+      if (typeof Papa !== 'undefined' && Papa.parse) {
+        const res = Papa.parse(text, { skipEmptyLines: true });
+        return res.data;
+      }
+      // Fallback robust state-machine parser
+      const rows = [];
+      let row = [];
+      let field = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        const next = text[i+1];
+        if (c === '"') {
+          if (inQuotes && next === '"') {
+            field += '"';
+            i++;
+          } else {
+            inQuotes = !inQuotes;
+          }
+        } else if (c === ',' && !inQuotes) {
+          row.push(field);
+          field = '';
+        } else if ((c === '\r' || c === '\n') && !inQuotes) {
+          if (c === '\r' && next === '\n') i++;
+          row.push(field);
+          rows.push(row);
+          row = [];
+          field = '';
+        } else {
+          field += c;
+        }
+      }
+      if (row.length > 0 || field) {
+        row.push(field);
+        rows.push(row);
+      }
+      return rows;
+    }
+
+    function parseStravaDate(dStr) {
+      if (!dStr) return null;
+      const d = new Date(dStr);
+      if (!isNaN(d.getTime())) {
+        const pad = n => String(n).padStart(2, '0');
+        const year = d.getFullYear();
+        const month = d.getMonth() + 1;
+        const day = d.getDate();
+        const dayStr = `${year}-${pad(month)}-${pad(day)}`;
+        const dateStr = `${dayStr} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+        
+        const start = new Date(year, 0, 1);
+        const diff = (d - start) + ((start.getTimezoneOffset() - d.getTimezoneOffset()) * 60 * 1000);
+        const doy = Math.floor(diff / (1000 * 60 * 60 * 24)) + 1;
+        const dow = (d.getDay() + 6) % 7; // 0=Mon, 6=Sun
+        return { dt: d, year, month, dayStr, dateStr, doy, dow };
+      }
+      return null;
+    }
+
+    function calculateEddington(dailyDict) {
+      const distances = Object.values(dailyDict).sort((a, b) => b - a);
+      let e = 0;
+      for (let i = 0; i < distances.length; i++) {
+        if (distances[i] >= (i + 1)) {
+          e = i + 1;
+        } else {
+          break;
+        }
+      }
+      const nextE = e + 1;
+      const qualifyingRides = distances.filter(d => d >= nextE).length;
+      const ridesNeeded = nextE - qualifyingRides;
+      return { e, ridesNeeded, nextE };
+    }
+
+    function processActivitiesClientSide(activitiesCsv, profileCsv, bikesCsv) {
+      const athlete = {
+        name: 'Strava Athlete',
+        location: '',
+        id: '',
+        weight: 72.0
+      };
+
+      if (profileCsv) {
+        try {
+          const pRows = parseCsvRows(profileCsv);
+          if (pRows.length > 1) {
+            const pHeaders = pRows[0].map(h => (h || '').trim().replace(/^"|"$/g, ''));
+            const fnIdx = pHeaders.indexOf('First Name');
+            const lnIdx = pHeaders.indexOf('Last Name');
+            const cityIdx = pHeaders.indexOf('City');
+            const countryIdx = pHeaders.indexOf('Country');
+            const idIdx = pHeaders.indexOf('Athlete ID');
+            const wIdx = pHeaders.indexOf('Weight');
+
+            const r = pRows[1];
+            const fn = (fnIdx >= 0 && r[fnIdx]) ? r[fnIdx].trim() : '';
+            const ln = (lnIdx >= 0 && r[lnIdx]) ? r[lnIdx].trim() : '';
+            if (fn || ln) athlete.name = `${fn} ${ln}`.trim();
+            const city = (cityIdx >= 0 && r[cityIdx]) ? r[cityIdx].trim() : '';
+            const country = (countryIdx >= 0 && r[countryIdx]) ? r[countryIdx].trim() : '';
+            if (city && country) athlete.location = `${city}, ${country}`;
+            else if (city) athlete.location = city;
+            if (idIdx >= 0 && r[idIdx]) athlete.id = r[idIdx].trim();
+            if (wIdx >= 0 && r[wIdx]) athlete.weight = parseFloat(r[wIdx]) || 72.0;
+          }
+        } catch (e) {
+          console.warn('Profile parse notice:', e);
+        }
+      }
+
+      const rows = parseCsvRows(activitiesCsv);
+      if (rows.length < 2) throw new Error('activities.csv does not contain enough records.');
+
+      const headers = rows[0].map(h => (h || '').trim().replace(/^"|"$/g, ''));
+      const t_idx = headers.indexOf('Activity Type');
+      const d_idx = headers.indexOf('Activity Date');
+      const name_idx = headers.indexOf('Activity Name');
+      const gear_idx = headers.indexOf('Activity Gear');
+      const commute_idx = headers.indexOf('Commute');
+      const id_idx = headers.indexOf('Activity ID');
+
+      if (t_idx === -1 || d_idx === -1) {
+        throw new Error('Required columns (Activity Type, Activity Date) were not found in activities.csv.');
+      }
+
+      const rides = [];
+      const daily_dist_km = {};
+      const daily_dist_mi = {};
+
+      for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        if (row.length <= t_idx) continue;
+        const act_type = (row[t_idx] || '').trim().replace(/^"|"$/g, '');
+        if (act_type !== 'Ride' && act_type !== 'Virtual Ride') continue;
+
+        const d_str = (row[d_idx] || '').trim().replace(/^"|"$/g, '');
+        if (!d_str) continue;
+
+        const pDate = parseStravaDate(d_str);
+        if (!pDate) continue;
+
+        const act_id = (id_idx >= 0 && row.length > id_idx) ? (row[id_idx] || '').trim().replace(/^"|"$/g, '') : '';
+        const name = (name_idx >= 0 && row.length > name_idx) ? (row[name_idx] || '').trim().replace(/^"|"$/g, '') : 'Ride';
+
+        let dist_m = 0.0;
+        if (row.length > 17 && row[17]) {
+          const v = parseFloat(row[17]);
+          if (!isNaN(v)) dist_m = v;
+        } else if (row.length > 6 && row[6]) {
+          const v = parseFloat(row[6]);
+          if (!isNaN(v)) dist_m = v * 1000.0;
+        }
+
+        let time_s = 0.0;
+        if (row.length > 16 && row[16]) {
+          const v = parseFloat(row[16]);
+          if (!isNaN(v)) time_s = v;
+        } else if (row.length > 5 && row[5]) {
+          const v = parseFloat(row[5]);
+          if (!isNaN(v)) time_s = v;
+        }
+
+        let elev_m = 0.0;
+        if (row.length > 20 && row[20]) {
+          const v = parseFloat(row[20]);
+          if (!isNaN(v)) elev_m = v;
+        }
+
+        let avg_speed_ms = 0.0;
+        if (row.length > 19 && row[19]) {
+          const v = parseFloat(row[19]);
+          if (!isNaN(v)) avg_speed_ms = v;
+        }
+
+        let avg_watts = 0.0;
+        if (row.length > 33 && row[33]) {
+          const v = parseFloat(row[33]);
+          if (!isNaN(v)) avg_watts = v;
+        }
+
+        let avg_hr = 0.0;
+        if (row.length > 31 && row[31]) {
+          const v = parseFloat(row[31]);
+          if (!isNaN(v)) avg_hr = v;
+        }
+
+        let calories = 0.0;
+        if (row.length > 34 && row[34]) {
+          const v = parseFloat(row[34]);
+          if (!isNaN(v)) calories = v;
+        }
+
+        let gear = 'Unassigned';
+        if (gear_idx >= 0 && row.length > gear_idx && (row[gear_idx] || '').trim()) {
+          gear = row[gear_idx].trim().replace(/^"|"$/g, '');
+        }
+
+        let commute = false;
+        if (commute_idx >= 0 && row.length > commute_idx && (row[commute_idx] || '').trim()) {
+          const c = row[commute_idx].trim().toLowerCase().replace(/^"|"$/g, '');
+          commute = (c === 'true' || c === '1' || c === '1.0');
+        }
+
+        const km = dist_m / 1000.0;
+        const miles = km * 0.621371;
+        daily_dist_km[pDate.dayStr] = (daily_dist_km[pDate.dayStr] || 0) + km;
+        daily_dist_mi[pDate.dayStr] = (daily_dist_mi[pDate.dayStr] || 0) + miles;
+
+        if (avg_speed_ms > 30.0) {
+          avg_speed_ms = time_s > 0 ? (dist_m / time_s) : 0.0;
+        }
+
+        rides.push({
+          id: act_id,
+          name: name,
+          date: pDate.dateStr,
+          day: pDate.dayStr,
+          year: pDate.year,
+          month: pDate.month,
+          day_of_week: pDate.dow,
+          day_of_year: pDate.doy,
+          type: act_type,
+          is_virtual: (act_type === 'Virtual Ride'),
+          is_commute: commute,
+          dist_km: parseFloat(km.toFixed(2)),
+          dist_mi: parseFloat(miles.toFixed(2)),
+          elev_m: parseFloat(elev_m.toFixed(1)),
+          elev_ft: parseFloat((elev_m * 3.28084).toFixed(1)),
+          time_s: Math.round(time_s),
+          speed_kmh: parseFloat((avg_speed_ms * 3.6).toFixed(1)),
+          speed_mph: parseFloat((avg_speed_ms * 2.23694).toFixed(1)),
+          watts: parseFloat(avg_watts.toFixed(1)),
+          hr: parseFloat(avg_hr.toFixed(1)),
+          cals: Math.round(calories),
+          gear: gear
+        });
+      }
+
+      rides.sort((a, b) => a.date.localeCompare(b.date));
+      if (rides.length === 0) {
+        throw new Error('No cycling activities (Ride or Virtual Ride) found in activities.csv.');
+      }
+
+      const totalRides = rides.length;
+      const eddingtonKm = calculateEddington(daily_dist_km);
+      const eddingtonMi = calculateEddington(daily_dist_mi);
+
+      // Streak & active days
+      const rideDays = Array.from(new Set(rides.map(r => r.day))).sort();
+      let maxStreak = 0;
+      let currStreak = 0;
+      let streakEndDate = null;
+      let prevD = null;
+      for (const dayS of rideDays) {
+        const d = new Date(dayS + 'T00:00:00');
+        if (prevD) {
+          const diff = Math.round((d - prevD) / 86400000);
+          if (diff === 1) currStreak++;
+          else currStreak = 1;
+        } else {
+          currStreak = 1;
+        }
+        if (currStreak > maxStreak) {
+          maxStreak = currStreak;
+          streakEndDate = dayS;
+        }
+        prevD = d;
+      }
+
+      // Records
+      const longestDistRide = rides.reduce((max, r) => r.dist_km > max.dist_km ? r : max, rides[0]);
+      const highestElevRide = rides.reduce((max, r) => r.elev_m > max.elev_m ? r : max, rides[0]);
+      const longestTimeRide = rides.reduce((max, r) => r.time_s > max.time_s ? r : max, rides[0]);
+
+      const substantiveRides = rides.filter(r => r.dist_km >= 25.0);
+      const fastestRide = substantiveRides.length > 0 
+        ? substantiveRides.reduce((max, r) => r.speed_kmh > max.speed_kmh ? r : max, substantiveRides[0])
+        : rides.reduce((max, r) => r.speed_kmh > max.speed_kmh ? r : max, rides[0]);
+
+      const powerRides = rides.filter(r => r.watts > 0 && r.dist_km >= 15.0);
+      const highestPowerRide = powerRides.length > 0
+        ? powerRides.reduce((max, r) => r.watts > max.watts ? r : max, powerRides[0])
+        : null;
+
+      // Centuries
+      const halfCenturiesKm = rides.filter(r => r.dist_km >= 50.0).length;
+      const metricCenturies = rides.filter(r => r.dist_km >= 100.0).length;
+      const imperialCenturies = rides.filter(r => r.dist_km >= 160.934).length;
+      const doubleCenturies = rides.filter(r => r.dist_km >= 200.0).length;
+
+      const allYears = Array.from(new Set(rides.map(r => r.year))).sort((a, b) => b - a);
+
+      // Cumulative progression curves (Day 1-365)
+      const cumulativeCurves = {};
+      const currentYear = new Date().getFullYear();
+      for (const y of allYears) {
+        const yRides = rides.filter(r => r.year === y);
+        const dayDists = {};
+        for (const r of yRides) {
+          dayDists[r.day_of_year] = (dayDists[r.day_of_year] || 0) + r.dist_km;
+        }
+        let maxDoy = 365;
+        if ((y % 4 === 0 && y % 100 !== 0) || (y % 400 === 0)) {
+          maxDoy = 366;
+        }
+        if (y === currentYear) {
+          maxDoy = Math.max(...yRides.map(r => r.day_of_year), 1);
+        }
+        let runningKm = 0;
+        const curveKm = [];
+        for (let d = 1; d <= maxDoy; d++) {
+          runningKm += (dayDists[d] || 0);
+          curveKm.push(parseFloat(runningKm.toFixed(1)));
+        }
+        cumulativeCurves[y.toString()] = curveKm;
+      }
+
+      // Yearly aggregation
+      const yearsData = {};
+      for (const y of allYears) {
+        const yRides = rides.filter(r => r.year === y);
+        const totalDistKm = yRides.reduce((acc, r) => acc + r.dist_km, 0);
+        const totalElevM = yRides.reduce((acc, r) => acc + r.elev_m, 0);
+        const totalTimeS = yRides.reduce((acc, r) => acc + r.time_s, 0);
+        const totalCals = yRides.reduce((acc, r) => acc + r.cals, 0);
+        const outdoorRides = yRides.filter(r => !r.is_virtual).length;
+        const virtualRides = yRides.filter(r => r.is_virtual).length;
+        const outdoorDistKm = yRides.filter(r => !r.is_virtual).reduce((acc, r) => acc + r.dist_km, 0);
+        const virtualDistKm = yRides.filter(r => r.is_virtual).reduce((acc, r) => acc + r.dist_km, 0);
+
+        const monthDistKm = new Array(12).fill(0);
+        const monthElevM = new Array(12).fill(0);
+        const monthRides = new Array(12).fill(0);
+        for (const r of yRides) {
+          const mIdx = r.month - 1;
+          monthDistKm[mIdx] += r.dist_km;
+          monthElevM[mIdx] += r.elev_m;
+          monthRides[mIdx]++;
+        }
+
+        const weightedSpeed = totalTimeS > 0 
+          ? yRides.reduce((acc, r) => acc + r.speed_kmh * r.time_s, 0) / totalTimeS
+          : 0;
+
+        yearsData[y.toString()] = {
+          year: y,
+          rides: yRides.length,
+          outdoor_rides: outdoorRides,
+          virtual_rides: virtualRides,
+          dist_km: parseFloat(totalDistKm.toFixed(1)),
+          dist_mi: parseFloat((totalDistKm * 0.621371).toFixed(1)),
+          outdoor_dist_km: parseFloat(outdoorDistKm.toFixed(1)),
+          virtual_dist_km: parseFloat(virtualDistKm.toFixed(1)),
+          elev_m: parseFloat(totalElevM.toFixed(1)),
+          elev_ft: parseFloat((totalElevM * 3.28084).toFixed(1)),
+          time_s: totalTimeS,
+          time_hrs: parseFloat((totalTimeS / 3600.0).toFixed(1)),
+          avg_speed_kmh: parseFloat(weightedSpeed.toFixed(1)),
+          avg_speed_mph: parseFloat((weightedSpeed * 0.621371).toFixed(1)),
+          avg_dist_km: yRides.length > 0 ? parseFloat((totalDistKm / yRides.length).toFixed(1)) : 0,
+          avg_dist_mi: yRides.length > 0 ? parseFloat(((totalDistKm / yRides.length) * 0.621371).toFixed(1)) : 0,
+          avg_elev_m: yRides.length > 0 ? parseFloat((totalElevM / yRides.length).toFixed(1)) : 0,
+          climbing_ratio_m_km: totalDistKm > 0 ? parseFloat((totalElevM / totalDistKm).toFixed(1)) : 0,
+          cals: totalCals,
+          monthly_dist_km: monthDistKm.map(x => parseFloat(x.toFixed(1))),
+          monthly_dist_mi: monthDistKm.map(x => parseFloat((x * 0.621371).toFixed(1))),
+          monthly_elev_m: monthElevM.map(x => parseFloat(x.toFixed(1))),
+          monthly_rides: monthRides,
+          centuries_100k: yRides.filter(r => r.dist_km >= 100.0).length,
+          centuries_100m: yRides.filter(r => r.dist_km >= 160.934).length,
+          longest_ride: yRides.length > 0 ? yRides.reduce((max, r) => r.dist_km > max.dist_km ? r : max, yRides[0]) : null,
+          biggest_climb: yRides.length > 0 ? yRides.reduce((max, r) => r.elev_m > max.elev_m ? r : max, yRides[0]) : null
+        };
+      }
+
+      // Lifetime Totals
+      const lifetimeDistKm = rides.reduce((acc, r) => acc + r.dist_km, 0);
+      const lifetimeElevM = rides.reduce((acc, r) => acc + r.elev_m, 0);
+      const lifetimeTimeS = rides.reduce((acc, r) => acc + r.time_s, 0);
+      const lifetimeCals = rides.reduce((acc, r) => acc + r.cals, 0);
+      const lifetimeOutdoorRides = rides.filter(r => !r.is_virtual).length;
+      const lifetimeVirtualRides = rides.filter(r => r.is_virtual).length;
+      const lifetimeOutdoorKm = rides.filter(r => !r.is_virtual).reduce((acc, r) => acc + r.dist_km, 0);
+      const lifetimeVirtualKm = rides.filter(r => r.is_virtual).reduce((acc, r) => acc + r.dist_km, 0);
+
+      // Gear fleet
+      const gearStats = {};
+      for (const r of rides) {
+        const g = r.gear || 'Unassigned';
+        if (!gearStats[g]) gearStats[g] = { rides: 0, dist_km: 0, elev_m: 0, time_s: 0 };
+        gearStats[g].rides++;
+        gearStats[g].dist_km += r.dist_km;
+        gearStats[g].elev_m += r.elev_m;
+        gearStats[g].time_s += r.time_s;
+      }
+      const gearList = Object.entries(gearStats).map(([name, data]) => {
+        const avgSpeed = data.time_s > 0 ? (data.dist_km / (data.time_s / 3600.0)) : 0;
+        return {
+          name,
+          rides: data.rides,
+          dist_km: parseFloat(data.dist_km.toFixed(1)),
+          dist_mi: parseFloat((data.dist_km * 0.621371).toFixed(1)),
+          elev_m: parseFloat(data.elev_m.toFixed(1)),
+          elev_ft: parseFloat((data.elev_m * 3.28084).toFixed(1)),
+          time_hrs: parseFloat((data.time_s / 3600.0).toFixed(1)),
+          avg_speed_kmh: parseFloat(avgSpeed.toFixed(1)),
+          avg_speed_mph: parseFloat((avgSpeed * 0.621371).toFixed(1)),
+          share_pct: lifetimeDistKm > 0 ? parseFloat(((data.dist_km / lifetimeDistKm) * 100.0).toFixed(1)) : 0
+        };
+      }).sort((a, b) => b.dist_km - a.dist_km);
+
+      // Habits
+      const dowCounts = new Array(7).fill(0);
+      const dowKm = new Array(7).fill(0);
+      for (const r of rides) {
+        dowCounts[r.day_of_week]++;
+        dowKm[r.day_of_week] += r.dist_km;
+      }
+
+      const distBucketsKm = new Array(6).fill(0);
+      for (const r of rides) {
+        const k = r.dist_km;
+        if (k < 25) distBucketsKm[0]++;
+        else if (k < 50) distBucketsKm[1]++;
+        else if (k < 75) distBucketsKm[2]++;
+        else if (k < 100) distBucketsKm[3]++;
+        else if (k < 150) distBucketsKm[4]++;
+        else distBucketsKm[5]++;
+      }
+
+      return {
+        athlete,
+        generated_at: new Date().toISOString().replace('T', ' ').substring(0, 16),
+        total_rides: totalRides,
+        unique_days: rideDays.length,
+        max_streak_days: maxStreak,
+        streak_end_date: streakEndDate,
+        eddington: {
+          km: eddingtonKm.e,
+          km_needed: eddingtonKm.ridesNeeded,
+          km_next: eddingtonKm.nextE,
+          mi: eddingtonMi.e,
+          mi_needed: eddingtonMi.ridesNeeded,
+          mi_next: eddingtonMi.nextE
+        },
+        centuries: {
+          half_km: halfCenturiesKm,
+          metric_100k: metricCenturies,
+          imperial_100m: imperialCenturies,
+          double_200k: doubleCenturies
+        },
+        trophies: {
+          longest_dist: longestDistRide,
+          highest_elev: highestElevRide,
+          longest_time: longestTimeRide,
+          fastest_ride: fastestRide,
+          highest_power: highestPowerRide
+        },
+        lifetime: {
+          dist_km: parseFloat(lifetimeDistKm.toFixed(1)),
+          dist_mi: parseFloat((lifetimeDistKm * 0.621371).toFixed(1)),
+          elev_m: parseFloat(lifetimeElevM.toFixed(1)),
+          elev_ft: parseFloat((lifetimeElevM * 3.28084).toFixed(1)),
+          time_s: lifetimeTimeS,
+          time_hrs: parseFloat((lifetimeTimeS / 3600.0).toFixed(1)),
+          time_days: parseFloat((lifetimeTimeS / 86400.0).toFixed(1)),
+          cals: lifetimeCals,
+          earth_laps: parseFloat((lifetimeDistKm / 40075.0).toFixed(2)),
+          everests: parseFloat((lifetimeElevM / 8848.86).toFixed(1)),
+          climbing_ratio_m_km: lifetimeDistKm > 0 ? parseFloat((lifetimeElevM / lifetimeDistKm).toFixed(1)) : 0,
+          outdoor_rides: lifetimeOutdoorRides,
+          virtual_rides: lifetimeVirtualRides,
+          outdoor_dist_km: parseFloat(lifetimeOutdoorKm.toFixed(1)),
+          virtual_dist_km: parseFloat(lifetimeVirtualKm.toFixed(1)),
+          avg_speed_kmh: lifetimeTimeS > 0 ? parseFloat((lifetimeDistKm / (lifetimeTimeS / 3600.0)).toFixed(1)) : 0,
+          avg_speed_mph: lifetimeTimeS > 0 ? parseFloat(((lifetimeDistKm / (lifetimeTimeS / 3600.0)) * 0.621371).toFixed(1)) : 0,
+          avg_dist_km: totalRides > 0 ? parseFloat((lifetimeDistKm / totalRides).toFixed(1)) : 0,
+          avg_dist_mi: totalRides > 0 ? parseFloat(((lifetimeDistKm / totalRides) * 0.621371).toFixed(1)) : 0
+        },
+        years: yearsData,
+        all_years: allYears,
+        cumulative_curves: cumulativeCurves,
+        gear: gearList,
+        habits: {
+          dow_counts: dowCounts,
+          dow_km: dowKm.map(x => parseFloat(x.toFixed(1))),
+          dist_buckets_km: distBucketsKm
+        },
+        rides_sample: rides
+      };
+    }
+
+    // ------------------------------------------
+    // Dashboard Loading & Switching
+    // ------------------------------------------
+    function loadDemoPreview() {
+      if (window.DEMO_DATA) {
+        loadDashboardData(window.DEMO_DATA, false);
+      } else {
+        showError('Demo Data Unavailable', 'The demo dataset script was not loaded. Please drop your own Strava export file.');
+      }
+    }
+
+    function returnToLanding() {
+      document.getElementById('dashboardView').classList.add('hidden');
+      document.getElementById('landingView').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function loadDashboardData(data, isPersonalStandalone) {
+      DASHBOARD_DATA = data;
+      activeCurveYears = data.all_years.slice(0, 5); // top 5 recent years
+
+      // Update titles and headers
+      document.getElementById('pageTitle').textContent = `${data.athlete.name} – Strava Cycling Analytics Dashboard`;
+      document.getElementById('headerAthleteName').textContent = data.athlete.name;
+      document.getElementById('headerAthleteLocation').textContent = data.athlete.location || 'Cyclist';
+      document.getElementById('headerTotalRides').textContent = `${data.total_rides.toLocaleString()} Rides`;
+      document.getElementById('footerAthleteName').textContent = data.athlete.name;
+      
+      const spanYears = data.all_years.length > 1 
+        ? `${data.all_years[data.all_years.length - 1]} – ${data.all_years[0]} (${data.all_years.length} Seasons)` 
+        : `${data.all_years[0]} Season`;
+      document.getElementById('headerYearsCycling').textContent = spanYears;
+
+      // Switch views
+      document.getElementById('landingView').classList.add('hidden');
+      document.getElementById('dashboardView').classList.remove('hidden');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // Initialize UI
+      setupYearSelector();
+      setupCurveYearButtons();
+      updateView();
+    }
+
+    // ------------------------------------------
+    // Standalone HTML Exporter
+    // ------------------------------------------
+    function downloadStandaloneHtml() {
+      if (!DASHBOARD_DATA) return;
+
+      const athleteSafe = DASHBOARD_DATA.athlete.name.replace(/[^a-zA-Z0-9_-]/g, '_').toLowerCase();
+      const filename = `strava_dashboard_${athleteSafe}.html`;
+
+      // Mark as standalone so when opened locally, it automatically launches dashboardView
+      const standaloneData = Object.assign({}, DASHBOARD_DATA, { is_personal_standalone: true });
+      const dataJsonStr = JSON.stringify(standaloneData);
+
+      let docHtml = document.documentElement.outerHTML;
+
+      // Replace embedded script tag
+      const scriptRegex = /<script id="embeddedDataScript">[\s\S]*?<\/script>/;
+      const newScript = `<script id="embeddedDataScript">\n    window.DEFAULT_DATA = ${dataJsonStr};\n  <\/script>`;
+      
+      let fullHtml = '<!DOCTYPE html>\n<html lang="en" class="dark">' + document.documentElement.innerHTML + '</html>';
+      fullHtml = fullHtml.replace(scriptRegex, newScript);
+
+      const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // ------------------------------------------
+    // Formatting Helpers
+    // ------------------------------------------
+    function formatDist(km) {
+      if (currentUnit === 'imperial') {
+        const mi = km * 0.621371;
+        return mi >= 1000 ? Math.round(mi).toLocaleString('en-US') : mi.toFixed(1);
+      }
+      return km >= 1000 ? Math.round(km).toLocaleString('en-US') : km.toFixed(1);
+    }
+
+    function distUnit() {
+      return currentUnit === 'imperial' ? 'mi' : 'km';
+    }
+
+    function formatElev(meters) {
+      if (currentUnit === 'imperial') {
+        const feet = meters * 3.28084;
+        return Math.round(feet).toLocaleString('en-US');
+      }
+      return Math.round(meters).toLocaleString('en-US');
+    }
+
+    function elevUnit() {
+      return currentUnit === 'imperial' ? 'ft' : 'm';
+    }
+
+    function formatSpeed(kmh) {
+      if (currentUnit === 'imperial') {
+        return (kmh * 0.621371).toFixed(1);
+      }
+      return kmh.toFixed(1);
+    }
+
+    function speedUnit() {
+      return currentUnit === 'imperial' ? 'mph' : 'km/h';
+    }
+
+    function formatDuration(seconds) {
+      const hrs = Math.floor(seconds / 3600);
+      const mins = Math.floor((seconds % 3600) / 60);
+      return `${hrs}h ${mins.toString().padStart(2, '0')}m`;
+    }
+
+    // ------------------------------------------
+    // View Rendering & State Handlers
+    // ------------------------------------------
+    function updateView() {
+      renderKPIs();
+      renderEddingtonAndRecords();
+      renderCumulativeChart();
+      renderGearChart();
+      renderAnnualVolumeChart();
+      renderMonthlyChart();
+      renderDowChart();
+      renderDistBucketsChart();
+      renderYoYTable();
+      renderRidesTable();
+    }
+
+    function setupYearSelector() {
+      const select = document.getElementById('yearSelector');
+      select.innerHTML = '<option value="lifetime">Lifetime (All Years)</option>';
+      DASHBOARD_DATA.all_years.forEach(y => {
+        const opt = document.createElement('option');
+        opt.value = y.toString();
+        opt.textContent = `${y} Season`;
+        select.appendChild(opt);
+      });
+      select.value = currentYearScope;
+    }
+
+    function setupCurveYearButtons() {
+      const container = document.getElementById('curveYearToggles');
+      container.innerHTML = '';
+      const recentYears = DASHBOARD_DATA.all_years.slice(0, 6);
+      recentYears.forEach(yr => {
+        const btn = document.createElement('button');
+        const isActive = activeCurveYears.includes(yr);
+        btn.className = `px-2 py-0.5 rounded text-[11px] font-mono font-medium transition ${isActive ? 'bg-strava text-white shadow' : 'bg-dark-800 text-slate-400 hover:text-white'}`;
+        btn.textContent = yr;
+        btn.onclick = () => toggleCurveYear(yr);
+        container.appendChild(btn);
+      });
+    }
+
+    function toggleCurveYear(yr) {
+      if (activeCurveYears.includes(yr)) {
+        if (activeCurveYears.length > 1) {
+          activeCurveYears = activeCurveYears.filter(y => y !== yr);
+        }
+      } else {
+        activeCurveYears.push(yr);
+      }
+      setupCurveYearButtons();
+      renderCumulativeChart();
+    }
+
+    function setUnit(unit) {
+      if (currentUnit === unit) return;
+      currentUnit = unit;
+      document.getElementById('btnMetric').className = (unit === 'metric')
+        ? 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg transition-all duration-200 bg-strava text-white shadow'
+        : 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all duration-200';
+      document.getElementById('btnImperial').className = (unit === 'imperial')
+        ? 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg transition-all duration-200 bg-strava text-white shadow'
+        : 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white transition-all duration-200';
+      updateView();
+    }
+
+    function setTypeFilter(filter) {
+      if (currentTypeFilter === filter) return;
+      currentTypeFilter = filter;
+      ['all', 'outdoor', 'virtual'].forEach(t => {
+        const btn = document.getElementById('btnType' + t.charAt(0).toUpperCase() + t.slice(1));
+        if (btn) {
+          btn.className = (currentTypeFilter === t)
+            ? 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg bg-dark-700 text-white'
+            : 'px-2 sm:px-2.5 py-1 text-xs font-semibold rounded-lg text-slate-400 hover:text-white';
+        }
+      });
+      updateView();
+    }
+
+    function onYearChange(yearVal) {
+      currentYearScope = yearVal;
+      updateView();
+    }
+
+    function getActiveScopeData() {
+      if (currentYearScope === 'lifetime') {
+        return DASHBOARD_DATA.lifetime;
+      }
+      return DASHBOARD_DATA.years[currentYearScope] || DASHBOARD_DATA.lifetime;
+    }
+
+    function getFilteredRides() {
+      let rides = DASHBOARD_DATA.rides_sample;
+      if (currentYearScope !== 'lifetime') {
+        const yNum = parseInt(currentYearScope);
+        rides = rides.filter(r => r.year === yNum);
+      }
+      if (currentTypeFilter === 'outdoor') {
+        rides = rides.filter(r => !r.is_virtual);
+      } else if (currentTypeFilter === 'virtual') {
+        rides = rides.filter(r => r.is_virtual);
+      }
+      return rides;
+    }
+
+    // ------------------------------------------
+    // Render Functions (KPIs, Records, Charts, Tables)
+    // ------------------------------------------
+    function renderKPIs() {
+      const data = getActiveScopeData();
+      const isLifetime = (currentYearScope === 'lifetime');
+
+      const scopeLabel = isLifetime 
+        ? `Lifetime Career Overview (${DASHBOARD_DATA.all_years[DASHBOARD_DATA.all_years.length - 1]} – ${DASHBOARD_DATA.all_years[0]})`
+        : `${currentYearScope} Season Performance Telemetry`;
+      document.getElementById('viewScopeLabel').textContent = scopeLabel;
+      document.getElementById('viewHeading').textContent = isLifetime ? 'All-Time Cycling Legacy' : `${currentYearScope} Season Arc`;
+      document.getElementById('viewSubtext').textContent = isLifetime
+        ? `${DASHBOARD_DATA.all_years.length} seasons of endurance, gravel, climbs, and virtual pain caves.`
+        : `Deep telemetry analysis for the ${currentYearScope} riding campaign.`;
+
+      document.getElementById('badgeEarthLaps').textContent = `${data.earth_laps || (data.dist_km / 40075).toFixed(2)}x Earth Circumference`;
+      document.getElementById('badgeEverests').textContent = `${data.everests || (data.elev_m / 8848.86).toFixed(1)}x Mt. Everest`;
+      document.getElementById('badgeTimeSaddle').textContent = `${data.time_days || (data.time_s / 86400).toFixed(1)} Days in Saddle`;
+
+      // 1. Distance
+      const dist = currentUnit === 'imperial' ? data.dist_mi : data.dist_km;
+      document.getElementById('statDistance').textContent = dist.toLocaleString();
+      document.getElementById('statDistanceUnit').textContent = currentUnit === 'imperial' ? 'miles' : 'kilometers';
+      const avgDist = currentUnit === 'imperial' ? data.avg_dist_mi : data.avg_dist_km;
+      document.getElementById('statAvgDist').textContent = `${avgDist} ${distUnit()}`;
+
+      // 2. Elevation
+      const elev = currentUnit === 'imperial' ? data.elev_ft : data.elev_m;
+      document.getElementById('statElevation').textContent = elev.toLocaleString();
+      document.getElementById('statElevationUnit').textContent = currentUnit === 'imperial' ? 'feet gained' : 'meters gained';
+      const ratioStr = currentUnit === 'imperial' ? `${(data.climbing_ratio_m_km * 5.28).toFixed(1)} ft/mi` : `${data.climbing_ratio_m_km} m/km`;
+      document.getElementById('statClimbRatio').textContent = ratioStr;
+
+      // 3. Time
+      document.getElementById('statTime').textContent = data.time_hrs.toLocaleString();
+      document.getElementById('statActiveDays').textContent = isLifetime ? `${DASHBOARD_DATA.unique_days.toLocaleString()} days` : `${data.rides} rides`;
+
+      // 4. Rides
+      const ridesCount = isLifetime ? DASHBOARD_DATA.total_rides : data.rides;
+      document.getElementById('statRides').textContent = ridesCount.toLocaleString();
+      document.getElementById('statRideSplit').textContent = `${data.outdoor_rides} / ${data.virtual_rides}`;
+
+      // 5. Speed
+      const speed = currentUnit === 'imperial' ? data.avg_speed_mph : data.avg_speed_kmh;
+      document.getElementById('statSpeed').textContent = speed.toFixed(1);
+      document.getElementById('statSpeedUnit').textContent = speedUnit();
+
+      // 6. Calories
+      document.getElementById('statCals').textContent = (data.cals || 0).toLocaleString();
+
+      // Footer summary
+      document.getElementById('footerSummaryMetrics').textContent = 
+        `Eddington: ${DASHBOARD_DATA.eddington.km} km / ${DASHBOARD_DATA.eddington.mi} mi • Total Volume: ${dist.toLocaleString()} ${distUnit()} • ${data.everests || (data.elev_m / 8848.86).toFixed(1)} Everests Climbed`;
+    }
+
+    function renderEddingtonAndRecords() {
+      const edd = DASHBOARD_DATA.eddington;
+      document.getElementById('eddingtonKm').textContent = edd.km;
+      document.getElementById('eddingtonKmStatus').textContent = `${edd.km_needed} ride${edd.km_needed === 1 ? '' : 's'} to E+1`;
+      document.getElementById('eddingtonKmTarget').textContent = `Target: ${edd.km_next} km`;
+
+      document.getElementById('eddingtonMi').textContent = edd.mi;
+      document.getElementById('eddingtonMiStatus').textContent = `${edd.mi_needed} ride${edd.mi_needed === 1 ? '' : 's'} to E+1`;
+      document.getElementById('eddingtonMiTarget').textContent = `Target: ${edd.mi_next} mi`;
+
+      const unitWord = currentUnit === 'imperial' ? `${edd.mi} miles on ${edd.mi}` : `${edd.km} km on ${edd.km}`;
+      document.getElementById('eddingtonDef').textContent = `${unitWord} distinct days`;
+
+      document.getElementById('streakDisplay').innerHTML = `
+        <span class="text-white font-bold">${DASHBOARD_DATA.max_streak_days} Days</span>
+        <span class="text-slate-500 text-[10px]">(${DASHBOARD_DATA.streak_end_date})</span>
+      `;
+
+      // Centuries
+      const cent = DASHBOARD_DATA.centuries;
+      document.getElementById('countHalfCentury').textContent = cent.half_km;
+      document.getElementById('countMetricCentury').textContent = cent.metric_100k;
+      document.getElementById('countImperialCentury').textContent = cent.imperial_100m;
+      document.getElementById('countDoubleCentury').textContent = cent.double_200k;
+      document.getElementById('centuriesTotalRides').textContent = `${cent.half_km + cent.metric_100k} total big rides`;
+
+      // Peak Records
+      const tro = DASHBOARD_DATA.trophies;
+      if (tro.longest_dist) {
+        document.getElementById('recordLongestName').textContent = tro.longest_dist.name;
+        document.getElementById('recordLongestVal').textContent = currentUnit === 'imperial' ? `${tro.longest_dist.dist_mi} mi` : `${tro.longest_dist.dist_km} km`;
+      }
+      if (tro.highest_elev) {
+        document.getElementById('recordClimbName').textContent = tro.highest_elev.name;
+        document.getElementById('recordClimbVal').textContent = currentUnit === 'imperial' ? `${tro.highest_elev.elev_ft} ft` : `${tro.highest_elev.elev_m} m`;
+      }
+      if (tro.longest_time) {
+        document.getElementById('recordTimeName').textContent = tro.longest_time.name;
+        document.getElementById('recordTimeVal').textContent = formatDuration(tro.longest_time.time_s);
+      }
+      if (tro.fastest_ride) {
+        document.getElementById('recordSpeedName').textContent = tro.fastest_ride.name;
+        document.getElementById('recordSpeedVal').textContent = currentUnit === 'imperial' ? `${tro.fastest_ride.speed_mph} mph` : `${tro.fastest_ride.speed_kmh} km/h`;
+      }
+    }
+
+    // Chart 1: Multi-Year Cumulative Pace Curves
+    function renderCumulativeChart() {
+      const ctx = document.getElementById('cumulativeChart').getContext('2d');
+      if (chartCumulative) chartCumulative.destroy();
+
+      const colors = ['#FC4C02', '#06B6D4', '#A855F7', '#10B981', '#F59E0B', '#64748B'];
+      const datasets = [];
+
+      activeCurveYears.forEach((yr, idx) => {
+        const curveKm = DASHBOARD_DATA.cumulative_curves[yr.toString()] || [];
+        const curveData = currentUnit === 'imperial' 
+          ? curveKm.map(k => Math.round(k * 0.621371))
+          : curveKm;
+
+        const isLatest = (yr === DASHBOARD_DATA.all_years[0]);
+        datasets.push({
+          label: `${yr}`,
+          data: curveData,
+          borderColor: colors[idx % colors.length],
+          backgroundColor: isLatest ? 'rgba(252, 76, 2, 0.08)' : 'transparent',
+          borderWidth: isLatest ? 3 : 1.8,
+          pointRadius: 0,
+          pointHoverRadius: 5,
+          tension: 0.15,
+          fill: isLatest
+        });
+      });
+
+      const dayLabels = Array.from({ length: 366 }, (_, i) => `Day ${i + 1}`);
+
+      chartCumulative = new Chart(ctx, {
+        type: 'line',
+        data: { labels: dayLabels, datasets: datasets },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: true, position: 'top', labels: { boxWidth: 12, color: '#94A3B8', font: { family: 'JetBrains Mono', size: 11 } } },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              titleColor: '#E2E8F0',
+              bodyFont: { family: 'JetBrains Mono' },
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.dataset.label}: ${context.parsed.y.toLocaleString()} ${distUnit()}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: '#1C232D', drawTicks: false },
+              ticks: {
+                color: '#64748B',
+                font: { family: 'JetBrains Mono', size: 10 },
+                maxTicksLimit: 12,
+                callback: function(val) {
+                  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const mIdx = Math.floor(val / 30.5);
+                  return months[mIdx] || '';
+                }
+              }
+            },
+            y: {
+              grid: { color: '#1C232D' },
+              ticks: {
+                color: '#64748B',
+                font: { family: 'JetBrains Mono', size: 10 },
+                callback: function(val) {
+                  return val.toLocaleString() + ' ' + distUnit();
+                }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Chart 2: Bike Fleet Breakdown
+    function renderGearChart() {
+      const ctx = document.getElementById('gearChart').getContext('2d');
+      if (chartGear) chartGear.destroy();
+
+      const gears = DASHBOARD_DATA.gear;
+      const labels = gears.map(g => g.name);
+      const dataValues = gears.map(g => currentUnit === 'imperial' ? g.dist_mi : g.dist_km);
+      const colors = ['#FC4C02', '#06B6D4', '#A855F7', '#10B981', '#F59E0B', '#64748B'];
+
+      chartGear = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: dataValues,
+            backgroundColor: colors.slice(0, gears.length),
+            borderColor: '#0F1318',
+            borderWidth: 2,
+            hoverOffset: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              bodyFont: { family: 'JetBrains Mono' },
+              callbacks: {
+                label: function(item) {
+                  const gear = gears[item.dataIndex];
+                  const val = currentUnit === 'imperial' ? gear.dist_mi : gear.dist_km;
+                  return ` ${gear.name}: ${val.toLocaleString()} ${distUnit()} (${gear.share_pct}%)`;
+                }
+              }
+            }
+          },
+          cutout: '70%'
+        }
+      });
+
+      // Render custom legend
+      const legendContainer = document.getElementById('gearListLegend');
+      legendContainer.innerHTML = '';
+      gears.forEach((g, i) => {
+        const val = currentUnit === 'imperial' ? g.dist_mi : g.dist_km;
+        const color = colors[i % colors.length];
+        const row = document.createElement('div');
+        row.className = 'flex items-center justify-between text-xs py-0.5';
+        row.innerHTML = `
+          <div class="flex items-center space-x-2 truncate">
+            <span class="w-2.5 h-2.5 rounded-full shrink-0" style="background-color: ${color}"></span>
+            <span class="truncate text-slate-300 font-medium">${g.name}</span>
+          </div>
+          <div class="font-mono text-slate-400 shrink-0 space-x-1.5">
+            <span class="text-white font-semibold">${val.toLocaleString()} ${distUnit()}</span>
+            <span class="text-[10px] text-slate-500">(${g.share_pct}%)</span>
+          </div>
+        `;
+        legendContainer.appendChild(row);
+      });
+    }
+
+    // Chart 3: Annual Volume & Outdoor vs Virtual Split
+    function renderAnnualVolumeChart() {
+      const ctx = document.getElementById('annualVolumeChart').getContext('2d');
+      if (chartVolume) chartVolume.destroy();
+
+      const yearsAsc = [...DASHBOARD_DATA.all_years].reverse();
+      const outdoorDists = [];
+      const virtualDists = [];
+
+      yearsAsc.forEach(yr => {
+        const yData = DASHBOARD_DATA.years[yr.toString()];
+        if (currentUnit === 'imperial') {
+          outdoorDists.push(Math.round(yData.outdoor_dist_km * 0.621371));
+          virtualDists.push(Math.round(yData.virtual_dist_km * 0.621371));
+        } else {
+          outdoorDists.push(yData.outdoor_dist_km);
+          virtualDists.push(yData.virtual_dist_km);
+        }
+      });
+
+      chartVolume = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: yearsAsc,
+          datasets: [
+            { label: 'Outdoor', data: outdoorDists, backgroundColor: '#FC4C02', stack: 'Stack 0', borderRadius: 4 },
+            { label: 'Virtual', data: virtualDists, backgroundColor: '#06B6D4', stack: 'Stack 0', borderRadius: 4 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              bodyFont: { family: 'JetBrains Mono' },
+              callbacks: {
+                label: function(context) {
+                  return ` ${context.dataset.label}: ${context.parsed.y.toLocaleString()} ${distUnit()}`;
+                },
+                footer: function(items) {
+                  const total = items.reduce((acc, curr) => acc + curr.parsed.y, 0);
+                  return ` Total: ${total.toLocaleString()} ${distUnit()}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 10 } }
+            },
+            y: {
+              grid: { color: '#1C232D' },
+              ticks: {
+                color: '#64748B',
+                font: { family: 'JetBrains Mono', size: 10 },
+                callback: function(val) { return val.toLocaleString() + ' ' + distUnit(); }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Chart 4: Monthly Seasonality
+    function renderMonthlyChart() {
+      const ctx = document.getElementById('monthlyChart').getContext('2d');
+      if (chartMonthly) chartMonthly.destroy();
+
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      let monthDists = new Array(12).fill(0);
+
+      if (currentYearScope === 'lifetime') {
+        document.getElementById('monthlyChartTitle').textContent = 'All-Time Monthly Aggregate Profile';
+        DASHBOARD_DATA.all_years.forEach(yr => {
+          const yData = DASHBOARD_DATA.years[yr.toString()];
+          const mList = currentUnit === 'imperial' ? yData.monthly_dist_mi : yData.monthly_dist_km;
+          mList.forEach((v, idx) => { monthDists[idx] += v; });
+        });
+        monthDists = monthDists.map(v => Math.round(v / DASHBOARD_DATA.all_years.length));
+      } else {
+        document.getElementById('monthlyChartTitle').textContent = `${currentYearScope} Monthly Mileage Distribution`;
+        const yData = DASHBOARD_DATA.years[currentYearScope];
+        monthDists = currentUnit === 'imperial' ? yData.monthly_dist_mi : yData.monthly_dist_km;
+      }
+
+      chartMonthly = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: months,
+          datasets: [{
+            label: currentYearScope === 'lifetime' ? 'Avg Monthly' : 'Monthly Distance',
+            data: monthDists,
+            backgroundColor: '#A855F7',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              bodyFont: { family: 'JetBrains Mono' },
+              callbacks: {
+                label: function(item) {
+                  return ` ${item.parsed.y.toLocaleString()} ${distUnit()}`;
+                }
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 10 } }
+            },
+            y: {
+              grid: { color: '#1C232D' },
+              ticks: {
+                color: '#64748B',
+                font: { family: 'JetBrains Mono', size: 10 },
+                callback: function(val) { return val.toLocaleString() + ' ' + distUnit(); }
+              }
+            }
+          }
+        }
+      });
+    }
+
+    // Chart 5: Day of Week Pattern
+    function renderDowChart() {
+      const ctx = document.getElementById('dowChart').getContext('2d');
+      if (chartDow) chartDow.destroy();
+
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const counts = DASHBOARD_DATA.habits.dow_counts;
+
+      chartDow = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: days,
+          datasets: [{
+            label: 'Total Rides',
+            data: counts,
+            backgroundColor: ['#3B82F6', '#6366F1', '#8B5CF6', '#A855F7', '#EC4899', '#FC4C02', '#F59E0B'],
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              bodyFont: { family: 'JetBrains Mono' }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 10 } }
+            },
+            y: {
+              grid: { color: '#1C232D' },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    // Chart 6: Distance Buckets
+    function renderDistBucketsChart() {
+      const ctx = document.getElementById('distBucketsChart').getContext('2d');
+      if (chartDistBuckets) chartDistBuckets.destroy();
+
+      const isImp = (currentUnit === 'imperial');
+      const labels = isImp 
+        ? ['<15 mi', '15–30 mi', '30–45 mi', '45–60 mi', '60–100 mi', '100+ mi']
+        : ['<25 km', '25–50 km', '50–75 km', '75–100 km', '100–150 km', '150+ km'];
+      const counts = DASHBOARD_DATA.habits.dist_buckets_km;
+
+      chartDistBuckets = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: 'Number of Rides',
+            data: counts,
+            backgroundColor: '#10B981',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#0F1318',
+              borderColor: '#2A3442',
+              borderWidth: 1,
+              bodyFont: { family: 'JetBrains Mono' }
+            }
+          },
+          scales: {
+            x: {
+              grid: { display: false },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 9 } }
+            },
+            y: {
+              grid: { color: '#1C232D' },
+              ticks: { color: '#64748B', font: { family: 'JetBrains Mono', size: 10 } }
+            }
+          }
+        }
+      });
+    }
+
+    // YoY Historical Comparison Table
+    function renderYoYTable() {
+      const tbody = document.getElementById('yoyTableBody');
+      tbody.innerHTML = '';
+
+      const currentYear = new Date().getFullYear();
+      const yearsDesc = DASHBOARD_DATA.all_years;
+      yearsDesc.forEach((yr) => {
+        const cur = DASHBOARD_DATA.years[yr.toString()];
+        const prevYearStr = (yr - 1).toString();
+        const prev = DASHBOARD_DATA.years[prevYearStr];
+
+        let pctChangeStr = '—';
+        let pctChangeColor = 'text-slate-500';
+        if (prev && prev.dist_km > 0) {
+          const pct = ((cur.dist_km - prev.dist_km) / prev.dist_km) * 100;
+          pctChangeStr = (pct >= 0 ? '+' : '') + pct.toFixed(1) + '%';
+          pctChangeColor = pct >= 0 ? 'text-emerald-400' : 'text-red-400';
+        }
+
+        const dist = currentUnit === 'imperial' ? cur.dist_mi : cur.dist_km;
+        const elev = currentUnit === 'imperial' ? cur.elev_ft : cur.elev_m;
+        const avgD = currentUnit === 'imperial' ? cur.avg_dist_mi : cur.avg_dist_km;
+        const avgS = currentUnit === 'imperial' ? cur.avg_speed_mph : cur.avg_speed_kmh;
+        const climbRatio = currentUnit === 'imperial' ? (cur.climbing_ratio_m_km * 5.28).toFixed(1) + ' ft/mi' : cur.climbing_ratio_m_km.toFixed(1) + ' m/km';
+
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-dark-850/60 transition cursor-pointer';
+        tr.onclick = () => {
+          document.getElementById('yearSelector').value = yr.toString();
+          onYearChange(yr.toString());
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+
+        tr.innerHTML = `
+          <td class="py-3 px-3 font-bold text-white flex items-center space-x-1.5">
+            <span>${yr}</span>
+            ${yr === currentYear ? '<span class="px-1.5 py-0.2 rounded text-[10px] bg-strava/20 text-strava font-sans">Active</span>' : ''}
+          </td>
+          <td class="py-3 px-3 text-slate-300">${cur.rides}</td>
+          <td class="py-3 px-3 text-slate-400 text-xs">${cur.outdoor_rides} / ${cur.virtual_rides}</td>
+          <td class="py-3 px-3 text-right font-bold text-strava">${dist.toLocaleString()} ${distUnit()}</td>
+          <td class="py-3 px-3 text-right text-cyan-300">${elev.toLocaleString()} ${elevUnit()}</td>
+          <td class="py-3 px-3 text-right text-slate-300">${cur.time_hrs.toLocaleString()} hrs</td>
+          <td class="py-3 px-3 text-right text-slate-400">${avgD} ${distUnit()}</td>
+          <td class="py-3 px-3 text-right text-emerald-400">${avgS} ${speedUnit()}</td>
+          <td class="py-3 px-3 text-right text-slate-400">${climbRatio}</td>
+          <td class="py-3 px-3 text-right font-bold ${pctChangeColor}">${pctChangeStr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    // Interactive Activity Log Table
+    function renderRidesTable() {
+      const tbody = document.getElementById('ridesTableBody');
+      tbody.innerHTML = '';
+
+      let rides = getFilteredRides();
+
+      // Search filter
+      if (rideSearchQuery.trim()) {
+        const q = rideSearchQuery.toLowerCase().trim();
+        rides = rides.filter(r => r.name.toLowerCase().includes(q) || r.gear.toLowerCase().includes(q));
+      }
+
+      // Sort
+      if (currentRideSort === 'date') {
+        rides.sort((a, b) => b.date.localeCompare(a.date));
+      } else if (currentRideSort === 'dist') {
+        rides.sort((a, b) => b.dist_km - a.dist_km);
+      } else if (currentRideSort === 'elev') {
+        rides.sort((a, b) => b.elev_m - a.elev_m);
+      } else if (currentRideSort === 'speed') {
+        rides.sort((a, b) => b.speed_kmh - a.speed_kmh);
+      }
+
+      document.getElementById('ridesTotalCount').textContent = rides.length.toLocaleString();
+      const visibleRides = rides.slice(0, ridesPageLimit);
+      document.getElementById('ridesDisplayCount').textContent = visibleRides.length.toLocaleString();
+
+      visibleRides.forEach(r => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-dark-850/60 transition';
+        
+        const distStr = currentUnit === 'imperial' ? `${r.dist_mi} mi` : `${r.dist_km} km`;
+        const elevStr = currentUnit === 'imperial' ? `${r.elev_ft} ft` : `${r.elev_m} m`;
+        const speedStr = currentUnit === 'imperial' ? `${r.speed_mph} mph` : `${r.speed_kmh} km/h`;
+        const timeStr = formatDuration(r.time_s);
+
+        const typeBadge = r.is_virtual 
+          ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 font-sans">Virtual</span>'
+          : '<span class="px-1.5 py-0.5 rounded text-[10px] bg-strava/10 text-strava border border-strava/20 font-sans">Outdoor</span>';
+
+        const powerOrHr = r.watts > 0 
+          ? `${r.watts}W` 
+          : (r.hr > 0 ? `${r.hr} bpm` : '—');
+
+        tr.innerHTML = `
+          <td class="py-2.5 px-3 text-slate-400 whitespace-nowrap">${r.date}</td>
+          <td class="py-2.5 px-3 font-semibold text-white max-w-xs truncate" title="${r.name}">${r.name}</td>
+          <td class="py-2.5 px-3">${typeBadge}</td>
+          <td class="py-2.5 px-3 text-slate-400 truncate max-w-[120px]" title="${r.gear}">${r.gear}</td>
+          <td class="py-2.5 px-3 text-right font-bold text-white">${distStr}</td>
+          <td class="py-2.5 px-3 text-right text-cyan-300">${elevStr}</td>
+          <td class="py-2.5 px-3 text-right text-slate-300">${timeStr}</td>
+          <td class="py-2.5 px-3 text-right text-emerald-400">${speedStr}</td>
+          <td class="py-2.5 px-3 text-right text-slate-400">${powerOrHr}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      const btnMore = document.getElementById('btnLoadMoreRides');
+      btnMore.style.display = (visibleRides.length >= rides.length) ? 'none' : 'inline-block';
+    }
+
+    function setRideSort(sortType) {
+      currentRideSort = sortType;
+      ['date', 'dist', 'elev', 'speed'].forEach(s => {
+        const btn = document.getElementById('sort' + s.charAt(0).toUpperCase() + s.slice(1) + 'Btn');
+        if (btn) {
+          btn.className = (currentRideSort === s)
+            ? 'px-2.5 py-1 rounded-lg bg-dark-700 text-white font-medium'
+            : 'px-2.5 py-1 rounded-lg text-slate-400 hover:text-white font-medium';
+        }
+      });
+      renderRidesTable();
+    }
+
+    function onSearchRides(query) {
+      rideSearchQuery = query;
+      ridesPageLimit = 50;
+      renderRidesTable();
+    }
+
+    function loadMoreRides() {
+      ridesPageLimit += 50;
+      renderRidesTable();
+    }
+
+    // ------------------------------------------
+    // Initial Boot Sequence
+    // ------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      // If DEFAULT_DATA is provided and marked as a personal standalone file, open dashboard directly
+      if (window.DEFAULT_DATA && window.DEFAULT_DATA.is_personal_standalone) {
+        loadDashboardData(window.DEFAULT_DATA, true);
+      }
+      // Otherwise, the page defaults to showing the clean landing view with Strava export instructions!
+    });
+  </script>
+</body>
+</html>
