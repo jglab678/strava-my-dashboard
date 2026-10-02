@@ -97,3 +97,13 @@ Getting your full history from Strava is free and takes just a few clicks:
 5. Under Step 2 (*"Download Request (optional)"*), click **Get Started**, then click **Request Your Archive**.
 6. Strava will generate your archive and send an email with a download link (usually within a few minutes).
 7. Download the `.zip` archive (e.g. `strava_export_*.zip`) and drop it into the application. Your dashboard will open immediately!
+
+---
+
+## 🤝 Contributing & Community
+
+Contributions are warmly welcomed! Whether you want to suggest a new cycling metric, report a CSV format quirk, or improve mobile styling, please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+* 🐛 Found a bug? [Open a Bug Report](https://github.com/jglab678/strava-my-dashboard/issues/new?template=bug_report.md)
+* 💡 Have an idea? [Suggest a Feature](https://github.com/jglab678/strava-my-dashboard/issues/new?template=feature_request.md)
+
