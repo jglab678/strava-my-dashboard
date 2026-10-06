@@ -1,10 +1,10 @@
 # 🚴🏃🥾 Strava Multi-Sport Analytics Suite
 
-Like many endurance athletes, I've been using Strava for years, and I like the yearly round-up and the metrics it showcases. But I always found that there were things missing, such as the ability to see my year on year progress and to compare it to previous years, dive into key sport-specific metrics and KPIs, and analyze my telemetry across **cycling, running, and hiking** without paywalls or annual wait-times.
+Like many us, I've been using Strava for years, and I like the yearly round-up and the metrics it showcases. But I always found that there were things missing, such as the ability to see my year on year progress and to compare it to previous years, dive into key sport-specific metrics and KPIs, and analyze my telemetry across **cycling, running, and hiking** without paywalls or annual wait-times.
 
 I wanted something simple, powerful, and secure: **zero logins, zero servers, and 100% private in-browser analysis** where my data never leaves my laptop.
 
-Whether you have been riding, running, or hiking for two seasons or twenty, this utility unlocks deep career milestones, pace dynamics, Eddington numbers, gear wear tracking, and vertical ascent telemetry from your Strava export archive.
+Whether you have been riding, running, or hiking for two seasons or twenty, this utility unlocks career milestones, pace dynamics, Eddington numbers, gear wear tracking, and vertical ascent telemetry from your Strava export archive.
 
 > 🌐 **Live Application & Demo**: Try it out or explore the multi-sport interactive demo at:  
 > **[https://strava-my-dashboard.pages.dev/](https://strava-my-dashboard.pages.dev/)**
