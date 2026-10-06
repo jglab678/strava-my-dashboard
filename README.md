@@ -1,12 +1,12 @@
-# 🚴 Strava Cycling Analytics Dashboard
+# 🚴🏃🥾 Strava Multi-Sport Analytics Suite
 
-Like many cyclists, I've been using Strava for years, and I like the yearly round-up and the metrics it showcases. But I always found that there were things missing, such as the ability to see my year on year progress and to compare it to previous years, dive into some key metrics and kpis. I also wanted something that was not just a once a year thing, but could be run anytime. So I decided to build this tool to address those gaps.
+Like many endurance athletes, I've been using Strava for years, and I like the yearly round-up and the metrics it showcases. But I always found that there were things missing, such as the ability to see my year on year progress and to compare it to previous years, dive into key sport-specific metrics and KPIs, and analyze my telemetry across **cycling, running, and hiking** without paywalls or annual wait-times.
 
-I wanted to create something simple and secure - I didn't want my data going anywhere beyond my laptop. 
+I wanted something simple, powerful, and secure: **zero logins, zero servers, and 100% private in-browser analysis** where my data never leaves my laptop.
 
-Whether you have been riding for two seasons or twenty, this utility securely unlocks deep career milestones, year-on-year pacing dynamics, Eddington consistency metrics, and bike fleet insights from your Strava history.
+Whether you have been riding, running, or hiking for two seasons or twenty, this utility unlocks deep career milestones, pace dynamics, Eddington numbers, gear wear tracking, and vertical ascent telemetry from your Strava export archive.
 
-> 🌐 **Live Application & Demo**: If you would like to use the app, try it out, or explore the interactive demo, the site is live and available at:  
+> 🌐 **Live Application & Demo**: Try it out or explore the multi-sport interactive demo at:  
 > **[https://strava-my-dashboard.pages.dev/](https://strava-my-dashboard.pages.dev/)**
 
 ---
@@ -20,7 +20,7 @@ Whether you have been riding for two seasons or twenty, this utility securely un
 
 ### Option B: Run Locally on Your Computer
 1. Clone or download this repository.
-2. Double-click [index.html](file:///Users/john/dev-lab/strava-my-dashboard/index.html) or run in your terminal:
+2. Open index.html in your browser or terminal:
    ```bash
    open index.html
    ```
@@ -32,57 +32,54 @@ Whether you have been riding for two seasons or twenty, this utility securely un
 
 ## 🔒 Security & Absolute Privacy
 
-Your cycling telemetry belongs to you. This utility was built from the ground up with a strict **Zero-Knowledge, Client-Side Architecture**:
+Your endurance telemetry belongs to you. This utility was built from the ground up with a strict **Zero-Knowledge, Client-Side Architecture**:
 
 * **100% In-Browser Processing**: When you select your Strava archive, your browser reads, unzips, and analyzes your data entirely within local memory using client-side JavaScript and WebAssembly.
-* **Zero Network Uploads**: None of your rides, GPS coordinates, heart rates, power numbers, or personal profile details are ever transmitted over the network or stored on any server.
-* **Inspectable & Verifiable**: You can open your browser's Developer Tools (Network tab) and verify for yourself that zero outbound HTTP requests are made when processing your data.
-* **Save Offline**: With one click, you can download a self-contained `.html` file of your dashboard to keep permanently on your computer and open offline anytime without an internet connection.
+* **Zero Network Uploads**: None of your GPS coordinates, heart rates, power numbers, paces, or personal profile details are ever transmitted over the network or stored on any server.
+* **Inspectable & Verifiable**: Open your browser's Developer Tools (Network tab) and verify for yourself that zero outbound HTTP requests are made when processing your data.
+* **Save Offline**: With one click, download a self-contained `.html` file of your dashboard to keep permanently on your computer and open offline anytime without an internet connection.
 
 ---
 
-## ⚡ Pure Simplicity: Zero Setup Required
+## ⚡ Unified Dashboards Across All Sports
 
-* **No Accounts or Logins**: No need to create another login or share Strava OAuth credentials.
-* **No Database or Backend**: No servers to maintain, no Python environments to configure, and no dependencies to install.
-* **Just Drag & Drop**: Drop your Strava `.zip` export (or `activities.csv`) onto the screen, and your complete dashboard renders in a fraction of a second.
-* **Live Web App Ready**: If you want to use the application, try it out, or explore the live demo immediately, the site is available at [https://strava-my-dashboard.pages.dev/](https://strava-my-dashboard.pages.dev/).
-* **Deploy Anywhere or Run Locally**: Because the utility consists of lightweight, self-contained static web files, you can open `index.html` directly from your local hard drive or host it on any static web host of your choice (Cloudflare Pages, GitHub Pages, Netlify, or your own web server).
+The application provides a united layout, look, and feel across **Cycling**, **Running**, and **Hiking**, with recognized KPIs and specialized trophy cabinets tailored to each sport:
+
+### 🚴 Cycling Dashboard
+* **Primary Telemetry**: Total Distance, Elevation Gain, Moving Saddle Time, Total Rides, Average Speed (weighted), Calories/Energy.
+* **Trophy Cabinet & Milestones**:
+  * **Eddington Number ($E$ km / $E$ mi)**: Days ridden $\ge E$ units + rides needed to reach $E + 1$.
+  * **Century Club**: Half Centuries (50 km+), Metric Centuries (100 km+), Imperial Centuries (100 mi+), and Double Centuries (200 km+).
+  * **Peak Records**: Longest ride distance, steepest climbing day, longest time in saddle, fastest sustained speed (>25 km).
+* **Equipment**: Bike fleet breakdown with mileage, climbing, duration, average speed, and percentage share.
+* **Charts & Analytics**: Day 1–365 cumulative mileage pace curve overlay, outdoor vs. virtual (Zwift) volume split, monthly seasonality, and day-of-week cadence.
+
+### 🏃 Running Dashboard
+* **Primary Telemetry**: Total Distance, Elevation Gain, Total Moving Time, Total Runs, **Average Pace** (`min/km` and `min/mi`), Calories.
+* **Trophy Cabinet & Milestones**:
+  * **Running Eddington Number ($E$ km / $E$ mi)**: Running days with at least $E$ distance + runs to next milestone.
+  * **Distance Milestone Tracker**: 5K Club ($\ge 5\text{ km}$), 10K Club ($\ge 10\text{ km}$), Half Marathon ($\ge 21.1\text{ km}$), Full Marathon ($\ge 42.2\text{ km}$), and Ultra Marathon ($\ge 50\text{ km}$).
+  * **Peak Records**: Longest run distance, highest elevation climb day, longest duration on feet, fastest sustained pace (>5 km).
+* **Shoe Rotation & Wear Tracker**: Mileage per pair of running shoes with an **active shoe wear % progress bar** based on standard ~700 km shoe lifespan recommendations.
+* **Charts & Analytics**: Day 1–365 cumulative running distance pace curves, surface split (Road vs. Trail vs. Virtual Treadmill), monthly running volume, and race-distance histogram brackets.
+
+### 🥾 Hiking & Walking Dashboard
+* **Primary Telemetry**: **Total Vertical Gain** (`m` / `ft`), Total Trail Distance, Time on Feet, Outings count, **Vertical Ascent Rate** (`m/hr` or `ft/hr` climbing velocity), **Steepness Index** (`m/km` or `ft/mi` average gradient).
+* **Trophy Cabinet & Milestones**:
+  * **Summit & Vert Milestones**: 500m+ Hill Climbs, 1,000m+ Mountain Summits, 1,400m+ Alpine Expeditions, and Big Treks ($\ge 15\text{ km}$).
+  * **Equivalencies**: Total Mt. Everest climbs ($\times 8,848.86\text{ m}$) and trail days.
+  * **Peak Records**: Single-day biggest elevation climb, longest trek distance, longest time on feet, steepest gradient day.
+* **Gear & Footwear Tracker**: Vertical climbed and outings across boots, trail shoes, and packs.
+* **Charts & Analytics**: Day 1–365 cumulative vertical climb curve overlay, Hike vs. Walk distribution, monthly mountain seasonality, and elevation gain distribution histogram.
 
 ---
 
-## 📊 What You Can Discover
+## 🌓 Dark & Light Mode Support
 
-Based on endurance cycling science and analytics frameworks (Strava Summit, VeloViewer, Intervals.icu, and Eddington theory), the dashboard gives you a comprehensive balance of **Career Milestones** and **Season-by-Season Dynamics**:
-
-### 1. Lifetime Milestones & Trophy Cabinet
-* **The Eddington Number ($E$)**: The definitive endurance metric (riding at least $E$ units on $E$ distinct days). Calculated for both Metric ($E\text{ km}$) and Imperial ($E\text{ miles}$), including the exact number of rides needed to reach $E + 1$.
-* **Century Club Tracker**: Automatic classification of Half Centuries ($50\text{ km+}$), Metric Centuries ($100\text{ km+}$), Imperial Centuries ($100\text{ mi+}$), and Double Centuries ($200\text{ km+}$).
-* **Equivalencies & Badges**:
-  * **Earth Circumferences**: Lifetime distance translated into laps around the planet ($\approx 40,075\text{ km}$ per lap).
-  * **Mt. Everest Summits**: Total elevation gain translated into Everests climbed ($8,848.86\text{ m}$ per climb).
-  * **Time in Saddle**: Total moving hours converted into full active days.
-* **All-Time Crown Records**:
-  * Longest ride distance & moving time.
-  * Steepest climbing day.
-  * Maximum sustained average speed ($>25\text{ km}$ rides).
-  * Longest consecutive active day streak.
-
-### 2. Year-on-Year (YoY) Dynamics & Pacing
-* **Multi-Year Cumulative Pace Curves (Day 1–365)**: Overlay seasonal progression curves to see in real-time whether your current year is ahead of or behind previous seasons.
-* **Annual Volume & Type Split**: Side-by-side annual comparisons breaking down **Outdoor road/gravel** vs. **Virtual indoor (Zwift)** mileage.
-* **Monthly Seasonality**: Peak summer tour vs. winter base training mileage profiles.
-* **Historical Ledger**: An interactive season comparison table showing ride counts, distance, elevation, saddle time, climbing ratio ($\text{m/km}$ or $\text{ft/mi}$), average speed, and YoY distance change (%).
-
-### 3. Equipment & Habit Analytics
-* **Bike Fleet Breakdown**: Mileage, climbing, duration, average speed, and percentage share across every bike in your garage.
-* **Day-of-Week Distribution**: Monday through Sunday ride counts to visualize your weekly rhythm.
-* **Distance Buckets**: Ride length distribution from short spins ($<25\text{ km}$) up to epic audax distances ($150+\text{ km}$).
-* **Searchable Activity Explorer**: Fast, searchable, and sortable log of all activities with duration, speed, elevation, power (Watts), and heart rate (bpm).
-
-### 4. Interactive UX
-* **One-Click Unit Toggle**: Instantly switch every metric, card, chart, and table between **Metric (km, m, km/h)** and **Imperial (mi, ft, mph)**.
-* **Season & Scope Filters**: Focus on any specific season or isolate Outdoor vs. Virtual rides.
+* **Header Sun/Moon Toggle**: Instant one-click switching between obsidian dark mode and clean, modern light mode.
+* **System-Aware**: Automatically detects your OS `prefers-color-scheme` on first launch.
+* **Persistent**: Saves your preference to `localStorage` and embeds your active theme into standalone HTML exports.
+* **Adaptive Visuals**: All Chart.js line, bar, and doughnut charts dynamically update gridlines, tooltips, and tick colors when toggling themes.
 
 ---
 
@@ -96,14 +93,13 @@ Getting your full history from Strava is free and takes just a few clicks:
 4. Scroll down to the **Download or Delete Your Account** section.
 5. Under Step 2 (*"Download Request (optional)"*), click **Get Started**, then click **Request Your Archive**.
 6. Strava will generate your archive and send an email with a download link (usually within a few minutes).
-7. Download the `.zip` archive (e.g. `strava_export_*.zip`) and drop it into the application. Your dashboard will open immediately!
+7. Download the `.zip` archive (e.g. `strava_export_*.zip`) and drop it into the application. Your multi-sport dashboard will open immediately!
 
 ---
 
 ## 🤝 Contributing & Community
 
-Contributions are warmly welcomed! Whether you want to suggest a new cycling metric, report a CSV format quirk, or improve mobile styling, please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+Contributions are warmly welcomed! Whether you want to suggest a new sport metric, report a CSV format quirk, or improve mobile styling, please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
 * 🐛 Found a bug? [Open a Bug Report](https://github.com/jglab678/strava-my-dashboard/issues/new?template=bug_report.md)
 * 💡 Have an idea? [Suggest a Feature](https://github.com/jglab678/strava-my-dashboard/issues/new?template=feature_request.md)
-
